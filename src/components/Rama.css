@@ -1,0 +1,45 @@
+/* Wrapper that holds the entire SVG and drives the float animation */
+.rama-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Float animation — Rama gently bobs up and down continuously */
+  animation: ramaFloat 4s ease-in-out infinite;
+}
+
+/* Floating keyframes — moves 10px up then back to origin */
+@keyframes ramaFloat {
+  0%   { transform: translateY(0px); }
+  50%  { transform: translateY(-10px); }
+  100% { transform: translateY(0px); }
+}
+
+/* Eye blink animation applied to both eye ellipses */
+/* scaleY(0) squishes the eye flat, simulating a blink */
+.rama-eye {
+  transform-origin: center;
+  animation: ramaBlink 5s ease-in-out infinite;
+}
+
+/* Stagger the blink so both eyes don't animate at identical times */
+.rama-eye:nth-child(2) {
+  animation-delay: 0.08s;
+}
+
+@keyframes ramaBlink {
+  0%,  92% { transform: scaleY(1); }   /* eyes open most of the time */
+  95%       { transform: scaleY(0.1); } /* blink closed */
+  98%       { transform: scaleY(1); }   /* blink open */
+  100%      { transform: scaleY(1); }
+}
+
+/* The halo ring slowly rotates to give a divine shimmer effect */
+.rama-halo {
+  transform-origin: 110px 95px;
+  animation: haloSpin 12s linear infinite;
+}
+
+@keyframes haloSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}

@@ -1,4 +1,5 @@
 import './App.css'
+import Rama from './components/Rama'
 
 export default function App() {
   return (
@@ -11,7 +12,7 @@ export default function App() {
 
       {/* CENTER STAGE - this is where the action will go down, RAMA will be here */}
       <div className="avatar-stage">
-        <p>Rama goes here</p>
+        <Rama />
       </div>
       
       {/* RIGHT PANEL - this is where the enjoy section will live */}
