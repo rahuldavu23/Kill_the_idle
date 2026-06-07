@@ -1,0 +1,40 @@
+.app-shell {
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+/* This the part where Rama will be in this UI */
+/* We will use this to position the avatar and the speech bubble, 
+stacks the avatar and the speech bubble vertically */
+.avatar-stage {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+.task-panel {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 280px;
+    height: 70vh; 
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 20px;
+    padding: 1.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+/* this is where the task panel on the left side will live */ 
+.task-panel.left {
+    left: 2rem;
+}
+
+/* this is where the task panel on the right side will live */
+.task-panel.right {
+    right: 2rem;
+}
