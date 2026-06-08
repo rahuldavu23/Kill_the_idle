@@ -1,45 +1,98 @@
-/* Wrapper that holds the entire SVG and drives the float animation */
+/* Outer wrapper — contains aura and image, drives the float */
 .rama-wrapper {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Float animation — Rama gently bobs up and down continuously */
+  /* Gentle continuous float animation */
   animation: ramaFloat 4s ease-in-out infinite;
 }
 
-/* Floating keyframes — moves 10px up then back to origin */
+/* Float keyframes — Rama bobs 12px up and back */
 @keyframes ramaFloat {
   0%   { transform: translateY(0px); }
-  50%  { transform: translateY(-10px); }
+  50%  { transform: translateY(-12px); }
   100% { transform: translateY(0px); }
 }
 
-/* Eye blink animation applied to both eye ellipses */
-/* scaleY(0) squishes the eye flat, simulating a blink */
-.rama-eye {
-  transform-origin: center;
-  animation: ramaBlink 5s ease-in-out infinite;
+/* The Rama PNG image itself */
+.rama-img {
+  position: relative;
+  z-index: 2;
+  width: 280px;
+  /* Preserve transparency from the PNG */
+  object-fit: contain;
+  /* Subtle drop shadow to ground him visually */
+  filter: drop-shadow(0 8px 24px rgba(100, 160, 255, 0.3));
+  transition: filter 0.4s ease;
 }
 
-/* Stagger the blink so both eyes don't animate at identical times */
-.rama-eye:nth-child(2) {
-  animation-delay: 0.08s;
+/* Aura glow layer — sits behind the image */
+.rama-aura {
+  position: absolute;
+  z-index: 1;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  /* Default idle aura — soft blue divine glow */
+  background: radial-gradient(
+    circle,
+    rgba(100, 180, 255, 0.25) 0%,
+    rgba(100, 180, 255, 0.08) 50%,
+    transparent 70%
+  );
+  /* Aura pulses in and out slowly */
+  animation: auraPulse 4s ease-in-out infinite;
 }
 
-@keyframes ramaBlink {
-  0%,  92% { transform: scaleY(1); }   /* eyes open most of the time */
-  95%       { transform: scaleY(0.1); } /* blink closed */
-  98%       { transform: scaleY(1); }   /* blink open */
-  100%      { transform: scaleY(1); }
+/* Aura pulse keyframes */
+@keyframes auraPulse {
+  0%   { transform: scale(1);    opacity: 0.8; }
+  50%  { transform: scale(1.12); opacity: 1;   }
+  100% { transform: scale(1);    opacity: 0.8; }
 }
 
-/* The halo ring slowly rotates to give a divine shimmer effect */
-.rama-halo {
-  transform-origin: 110px 95px;
-  animation: haloSpin 12s linear infinite;
+/* ── MOOD VARIATIONS ── */
+
+/* Happy — warm golden glow */
+.rama-aura--happy {
+  background: radial-gradient(
+    circle,
+    rgba(255, 220, 80, 0.35) 0%,
+    rgba(255, 180, 40, 0.1) 50%,
+    transparent 70%
+  );
 }
 
-@keyframes haloSpin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
+/* Thinking — cool purple glow */
+.rama-aura--thinking {
+  background: radial-gradient(
+    circle,
+    rgba(160, 100, 255, 0.3) 0%,
+    rgba(120, 60, 220, 0.08) 50%,
+    transparent 70%
+  );
+}
+
+/* Amused — warm orange glow */
+.rama-aura--amused {
+  background: radial-gradient(
+    circle,
+    rgba(255, 140, 60, 0.3) 0%,
+    rgba(255, 100, 20, 0.08) 50%,
+    transparent 70%
+  );
+}
+
+/* Mood image transition — smooth swap between states */
+.rama-img--happy {
+  filter: drop-shadow(0 8px 28px rgba(255, 220, 80, 0.45));
+}
+
+.rama-img--thinking {
+  filter: drop-shadow(0 8px 28px rgba(160, 100, 255, 0.4));
+}
+
+.rama-img--amused {
+  filter: drop-shadow(0 8px 28px rgba(255, 140, 60, 0.4));
 }
