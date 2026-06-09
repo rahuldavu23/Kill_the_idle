@@ -1,98 +1,399 @@
-/* Outer wrapper — contains aura and image, drives the float */
-.rama-wrapper {
+/* ───────────────────────────────────────────── */
+/* RAMA AVATAR RIG SYSTEM */
+/* ───────────────────────────────────────────── */
+
+/* 
+  Root wrapper:
+  Controls the full avatar size and whole-body mood animations.
+*/
+.rama-root {
   position: relative;
+  width: clamp(220px, 18vw, 340px);
+  height: clamp(480px, 44vw, 680px);
+
   display: flex;
   align-items: center;
   justify-content: center;
-  /* Gentle continuous float animation */
+
   animation: ramaFloat 4s ease-in-out infinite;
+  transform-origin: center center;
+
+  pointer-events: auto;
 }
 
-/* Float keyframes — Rama bobs 12px up and back */
+/* Default idle floating animation */
 @keyframes ramaFloat {
-  0%   { transform: translateY(0px); }
-  50%  { transform: translateY(-12px); }
-  100% { transform: translateY(0px); }
+  0%, 100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-10px);
+  }
 }
 
-/* The Rama PNG image itself */
-.rama-img {
+/* 
+  Character body:
+  All PNG body parts are positioned inside this.
+*/
+.rama-body {
   position: relative;
-  z-index: 2;
-  width: 280px;
-  /* Preserve transparency from the PNG */
-  object-fit: contain;
-  /* Subtle drop shadow to ground him visually */
-  filter: drop-shadow(0 8px 24px rgba(100, 160, 255, 0.3));
-  transition: filter 0.4s ease;
+  width: 100%;
+  height: 100%;
 }
 
-/* Aura glow layer — sits behind the image */
+/* 
+  Shared image layer style:
+  Every Rama body part uses this.
+*/
+.rama-layer {
+  position: absolute;
+  display: block;
+  object-fit: contain;
+  background: transparent;
+
+  user-select: none;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+/* ───────────────────────────────────────────── */
+/* AURA */
+/* ───────────────────────────────────────────── */
+
 .rama-aura {
   position: absolute;
-  z-index: 1;
-  width: 260px;
-  height: 260px;
+
+  width: 92%;
+  aspect-ratio: 1 / 1;
+
+  left: 50%;
+  top: 47%;
+
   border-radius: 50%;
-  /* Default idle aura — soft blue divine glow */
+
+  transform: translate(-50%, -50%);
+
   background: radial-gradient(
     circle,
-    rgba(100, 180, 255, 0.25) 0%,
-    rgba(100, 180, 255, 0.08) 50%,
-    transparent 70%
+    rgba(100, 180, 255, 0.22) 0%,
+    rgba(100, 180, 255, 0.06) 52%,
+    transparent 72%
   );
-  /* Aura pulses in and out slowly */
+
   animation: auraPulse 4s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 0;
 }
 
-/* Aura pulse keyframes */
 @keyframes auraPulse {
-  0%   { transform: scale(1);    opacity: 0.8; }
-  50%  { transform: scale(1.12); opacity: 1;   }
-  100% { transform: scale(1);    opacity: 0.8; }
+  0%, 100% {
+    transform: translate(-50%, -50%) scale(1);
+    opacity: 0.75;
+  }
+
+  50% {
+    transform: translate(-50%, -50%) scale(1.08);
+    opacity: 1;
+  }
 }
 
-/* ── MOOD VARIATIONS ── */
+/* ───────────────────────────────────────────── */
+/* BODY PARTS */
+/* ───────────────────────────────────────────── */
 
-/* Happy — warm golden glow */
+/* 
+  Dhoti / lower body:
+  Enlarged and moved upward so the legs do not feel too tiny
+  compared to the torso.
+*/
+.rama-dhoti {
+  width: 110%;
+
+  left: 51%;
+  top: 50%;
+
+  transform: translateX(-50%);
+  transform-origin: top center;
+
+  z-index: 2;
+
+  animation: dhotiSway 5s ease-in-out infinite;
+}
+
+@keyframes dhotiSway {
+  0%, 100% {
+    transform: translateX(-50%) rotate(0deg);
+  }
+
+  40% {
+    transform: translateX(-50%) rotate(0.45deg);
+  }
+
+  70% {
+    transform: translateX(-50%) rotate(-0.35deg);
+  }
+}
+
+/* 
+  Torso:
+  Reduced from the previous oversized look.
+  This should now feel more proportionate to the arms and legs.
+*/
+.rama-torso {
+  width: 75%;
+
+  left: 50%;
+  top: 22%;
+
+  transform: translateX(-50%);
+  transform-origin: center top;
+
+  z-index: 4;
+
+  animation: torsoBreath 4s ease-in-out infinite;
+}
+
+@keyframes torsoBreath {
+  0%, 100% {
+    transform: translateX(-50%) scale(1);
+  }
+
+  50% {
+    transform: translateX(-50%) scale(1.012);
+  }
+}
+
+/* 
+  Bow arm:
+  Pulled inward and attached closer to the shoulder.
+*/
+.rama-arm-bow {
+  width: 78%;
+
+  left: 58%;
+  top: 19%;
+
+  transform: rotate(0deg);
+  transform-origin: 15% 12%;
+
+  z-index: 5;
+
+  animation: bowHold 5s ease-in-out infinite;
+}
+
+@keyframes bowHold {
+  0%, 100% {
+    transform: rotate(0deg);
+  }
+
+  40% {
+    transform: rotate(1.1deg);
+  }
+
+  70% {
+    transform: rotate(-0.8deg);
+  }
+}
+
+/* 
+  Free arm:
+  Enlarged and raised so it better matches the torso scale.
+*/
+.rama-arm-free {
+  width: 47%;
+
+  left: -3.8%;
+  top: 41%;
+
+  transform: rotate(8deg);
+  transform-origin: 70% 10%;
+
+  z-index: 5;
+
+  animation: armSway 4s ease-in-out infinite;
+}
+
+@keyframes armSway {
+  0%, 100% {
+    transform: rotate(8deg);
+  }
+
+  50% {
+    transform: rotate(10deg);
+  }
+}
+
+/* 
+  Head:
+  Moved closer to the torso to reduce the disconnected neck gap.
+*/
+.rama-head {
+  width: 60%;
+
+  left: 51%;
+  top: 15.35%;
+
+  transform: translateX(-50%);
+  transform-origin: bottom center;
+
+  z-index: 8;
+
+  animation: headBob 6s ease-in-out infinite;
+}
+
+@keyframes headBob {
+  0%, 100% {
+    transform: translateX(-50%) rotate(0deg);
+  }
+
+  25% {
+    transform: translateX(-50%) rotate(-1deg);
+  }
+
+  75% {
+    transform: translateX(-50%) rotate(1deg);
+  }
+}
+
+/* ───────────────────────────────────────────── */
+/* MOOD AURA VARIANTS */
+/* ───────────────────────────────────────────── */
+
+.rama-aura--idle {
+  background: radial-gradient(
+    circle,
+    rgba(100, 180, 255, 0.22) 0%,
+    rgba(100, 180, 255, 0.06) 52%,
+    transparent 72%
+  );
+}
+
 .rama-aura--happy {
   background: radial-gradient(
     circle,
-    rgba(255, 220, 80, 0.35) 0%,
-    rgba(255, 180, 40, 0.1) 50%,
-    transparent 70%
+    rgba(255, 220, 80, 0.32) 0%,
+    rgba(255, 180, 40, 0.08) 52%,
+    transparent 72%
   );
 }
 
-/* Thinking — cool purple glow */
 .rama-aura--thinking {
   background: radial-gradient(
     circle,
-    rgba(160, 100, 255, 0.3) 0%,
-    rgba(120, 60, 220, 0.08) 50%,
-    transparent 70%
+    rgba(160, 100, 255, 0.28) 0%,
+    rgba(120, 60, 220, 0.06) 52%,
+    transparent 72%
   );
 }
 
-/* Amused — warm orange glow */
 .rama-aura--amused {
   background: radial-gradient(
     circle,
-    rgba(255, 140, 60, 0.3) 0%,
-    rgba(255, 100, 20, 0.08) 50%,
-    transparent 70%
+    rgba(255, 140, 60, 0.28) 0%,
+    rgba(255, 100, 20, 0.06) 52%,
+    transparent 72%
   );
 }
 
-/* Mood image transition — smooth swap between states */
-.rama-img--happy {
-  filter: drop-shadow(0 8px 28px rgba(255, 220, 80, 0.45));
+.rama-aura--speaking {
+  background: radial-gradient(
+    circle,
+    rgba(80, 255, 180, 0.25) 0%,
+    rgba(40, 200, 140, 0.06) 52%,
+    transparent 72%
+  );
+
+  animation: auraPulse 1.5s ease-in-out infinite;
 }
 
-.rama-img--thinking {
-  filter: drop-shadow(0 8px 28px rgba(160, 100, 255, 0.4));
+/* ───────────────────────────────────────────── */
+/* MOOD BODY VARIANTS */
+/* ───────────────────────────────────────────── */
+
+/* Idle keeps the default float */
+.rama-root--idle {
+  animation: ramaFloat 4s ease-in-out infinite;
 }
 
-.rama-img--amused {
-  filter: drop-shadow(0 8px 28px rgba(255, 140, 60, 0.4));
+/* Happy — slightly bouncier */
+.rama-root--happy {
+  animation: ramaHappy 0.85s ease-in-out infinite;
+}
+
+@keyframes ramaHappy {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+
+  50% {
+    transform: translateY(-14px) rotate(0.4deg);
+  }
+}
+
+/* Thinking — slower side sway */
+.rama-root--thinking {
+  animation: ramaThink 3s ease-in-out infinite;
+}
+
+@keyframes ramaThink {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+
+  50% {
+    transform: translateY(-5px) rotate(-1deg);
+  }
+}
+
+/* Amused — quick small shake */
+.rama-root--amused {
+  animation: ramaAmused 0.5s ease-in-out 3;
+}
+
+@keyframes ramaAmused {
+  0%, 100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-4px);
+  }
+
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+/* Speaking — subtle active bounce */
+.rama-root--speaking {
+  animation: ramaSpeaking 1.6s ease-in-out infinite;
+}
+
+@keyframes ramaSpeaking {
+  0%, 100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-7px);
+  }
+}
+
+/* ───────────────────────────────────────────── */
+/* OPTIONAL RESPONSIVE TUNING */
+/* ───────────────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .rama-root {
+    width: 240px;
+    height: 520px;
+  }
+}
+
+@media (max-width: 480px) {
+  .rama-root {
+    width: 200px;
+    height: 460px;
+  }
 }
