@@ -7,10 +7,8 @@
     position: relative;
 }
 
-/* This the part where Rama will be in this UI */
-/* We will use this to position the avatar and the speech bubble, 
-stacks the avatar and the speech bubble vertically */
 .avatar-stage {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -18,23 +16,219 @@ stacks the avatar and the speech bubble vertically */
     z-index: 10;
 }
 
+/* ─── Panels ─────────────────────────────────────────────── */
+
 .task-panel {
     position: absolute;
     top: 50%;
     transform: translateY(-50%);
     width: 280px;
-    height: 70vh; 
+    height: 70vh;
     background: rgba(255, 255, 255, 0.04);
     border-radius: 20px;
     padding: 1.5rem;
     border: 1px solid rgba(255, 255, 255, 0.08);
-}
-/* this is where the task panel on the left side will live */ 
-.task-panel.left {
-    left: 2rem;
+    display: flex;
+    flex-direction: column;
 }
 
-/* this is where the task panel on the right side will live */
-.task-panel.right {
-    right: 2rem;
+.task-panel.left  { left: 2rem; }
+.task-panel.right { right: 2rem; }
+
+.panel-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.35);
+    margin: 0 0 1rem;
+}
+
+/* ─── Panel input row ─────────────────────────────────────── */
+
+.panel-input-row {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+}
+
+.panel-input {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 10px;
+    padding: 0.45rem 0.75rem;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 0.82rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.panel-input:focus {
+    border-color: rgba(255, 200, 100, 0.35);
+}
+
+.panel-input::placeholder {
+    color: rgba(255, 255, 255, 0.2);
+}
+
+.panel-add-btn {
+    background: rgba(255, 200, 100, 0.10);
+    border: 1px solid rgba(255, 200, 100, 0.25);
+    border-radius: 10px;
+    color: rgba(255, 200, 100, 0.75);
+    font-size: 1.3rem;
+    line-height: 1;
+    width: 36px;
+    cursor: pointer;
+    transition: background 0.2s;
+    flex-shrink: 0;
+}
+
+.panel-add-btn:hover {
+    background: rgba(255, 200, 100, 0.22);
+}
+
+/* ─── Item list ───────────────────────────────────────────── */
+
+.panel-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.panel-list::-webkit-scrollbar {
+    width: 3px;
+}
+.panel-list::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 2px;
+}
+
+.panel-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.45rem 0.25rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+.panel-item--done .item-text {
+    text-decoration: line-through;
+    color: rgba(255, 255, 255, 0.25);
+}
+
+.item-check {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 200, 100, 0.35);
+    background: transparent;
+    cursor: pointer;
+    color: rgba(255, 200, 100, 0.85);
+    font-size: 0.65rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.panel-item--done .item-check {
+    background: rgba(255, 200, 100, 0.18);
+    border-color: rgba(255, 200, 100, 0.5);
+}
+
+.item-check:hover {
+    background: rgba(255, 200, 100, 0.12);
+}
+
+.item-bullet {
+    font-size: 0.45rem;
+    color: rgba(255, 200, 100, 0.35);
+    flex-shrink: 0;
+}
+
+.item-text {
+    flex: 1;
+    font-size: 0.82rem;
+    color: rgba(255, 255, 255, 0.78);
+    line-height: 1.35;
+}
+
+.item-remove {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.15);
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 0 0.2rem;
+    line-height: 1;
+    transition: color 0.2s;
+    flex-shrink: 0;
+}
+
+.item-remove:hover {
+    color: rgba(255, 80, 80, 0.55);
+}
+
+/* ─── Rama chat input ─────────────────────────────────────── */
+
+.rama-clickable {
+    cursor: pointer;
+}
+
+.rama-chat {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-top: 1.25rem;
+    width: 260px;
+}
+
+.rama-chat-input {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 20px;
+    padding: 0.45rem 1rem;
+    color: rgba(255, 255, 255, 0.85);
+    font-size: 0.82rem;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.2s;
+}
+
+.rama-chat-input:focus {
+    border-color: rgba(255, 200, 100, 0.28);
+}
+
+.rama-chat-input::placeholder {
+    color: rgba(255, 255, 255, 0.18);
+}
+
+.rama-chat-btn {
+    background: rgba(255, 200, 100, 0.08);
+    border: 1px solid rgba(255, 200, 100, 0.22);
+    border-radius: 50%;
+    width: 34px;
+    height: 34px;
+    color: rgba(255, 200, 100, 0.65);
+    cursor: pointer;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: background 0.2s;
+}
+
+.rama-chat-btn:hover {
+    background: rgba(255, 200, 100, 0.18);
 }

@@ -1,0 +1,59 @@
+/* Outer wrapper — positions the bubble above Rama */
+/* Hidden by default, fades in when bubble-visible is added */
+.bubble-wrapper {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  opacity: 0;
+  /* Smooth fade in and subtle rise animation */
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  transform: translateX(-50%) translateY(8px);
+  pointer-events: none;
+  z-index: 100;
+  width: 280px;
+}
+
+/* Active state — fades in and rises into position */
+.bubble-visible {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0px) !important;
+}
+
+/* The main speech bubble box */
+.bubble-box {
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 16px;
+  padding: 14px 18px;
+  box-shadow:
+    0 4px 24px rgba(0, 0, 0, 0.3),
+    0 0 0 2px rgba(255, 210, 80, 0.4);
+  position: relative;
+  width: 100%;
+}
+
+/* The speech text inside the bubble */
+.bubble-text {
+  font-size: 13px;
+  line-height: 1.6;
+  color: #1A1A2E;
+  font-style: italic;
+  text-align: center;
+  margin: 0;
+}
+
+/* The pointed tail connecting bubble to Rama's head */
+/* Created with CSS border trick — a zero-size element */
+/* with colored borders creates a triangle */
+.bubble-tail {
+  width: 0;
+  height: 0;
+  border-left: 10px solid transparent;
+  border-right: 10px solid transparent;
+  border-top: 14px solid rgba(255, 255, 255, 0.96);
+  /* Drop shadow on the tail to match the box */
+  filter: drop-shadow(0 3px 3px rgba(0,0,0,0.15));
+  margin-top: -1px;
+}

@@ -141,7 +141,7 @@
   This should now feel more proportionate to the arms and legs.
 */
 .rama-torso {
-  width: 75%;
+  width: 76%;
 
   left: 50%;
   top: 22%;
@@ -169,10 +169,10 @@
   Pulled inward and attached closer to the shoulder.
 */
 .rama-arm-bow {
-  width: 78%;
+  width: 75%;
 
   left: 58%;
-  top: 19%;
+  top: 19.5%;
 
   transform: rotate(0deg);
   transform-origin: 15% 12%;
@@ -201,10 +201,10 @@
   Enlarged and raised so it better matches the torso scale.
 */
 .rama-arm-free {
-  width: 47%;
+  width: 49.5%;
 
-  left: -3.8%;
-  top: 41%;
+  left: -5%;
+  top: 40.5%;
 
   transform: rotate(8deg);
   transform-origin: 70% 10%;
@@ -229,7 +229,7 @@
   Moved closer to the torso to reduce the disconnected neck gap.
 */
 .rama-head {
-  width: 60%;
+  width: 62%;
 
   left: 51%;
   top: 15.35%;
