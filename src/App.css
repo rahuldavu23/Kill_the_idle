@@ -202,6 +202,9 @@
     gap: 0.5rem;
     margin-top: 1.25rem;
     width: 260px;
+    flex: 0 0 auto;
+    position: relative; 
+    z-index: 20;
 }
 
 .rama-chat-input {
