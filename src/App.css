@@ -12,7 +12,10 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
+    justify-content: flex-end;
+    height: 100vh;
+    padding-bottom: 2.5rem;
+    box-sizing:border-box;
     z-index: 10;
 }
 
@@ -184,6 +187,15 @@
     cursor: pointer;
 }
 
+.rama-avatar {
+    postion: relative;
+    flex: 1 1 auto;
+    min-height: 0;
+    width: auto;
+    height: 100%;
+    max-height: 100%;
+    aspect-ratio: 1 / 2.2;
+}
 .rama-chat {
     display: flex;
     align-items: center;
