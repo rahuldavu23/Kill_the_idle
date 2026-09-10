@@ -96,32 +96,116 @@
   transition: transform 0.06s ease-out;
 }
 
-.rama-brow {
+/* Lash line — the heaviest ink on the face, as in cel animation */
+.rama-lash {
   fill: none;
-  stroke: #141425;
+  stroke: #17172b;
   stroke-width: 5.5;
   stroke-linecap: round;
+}
+
+/* Overdrawn outer half, faking the taper of a brush stroke */
+.rama-lash--outer { stroke-width: 8.5; }
+.rama-lash--flick { stroke-width: 4.5; }
+
+.rama-lid-lower {
+  fill: none;
+  stroke: #6ea9d2;
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  opacity: 0.65;
+}
+
+/* The closed-eye arc cross-fades with the lid so a blink reads as a
+   drawn frame rather than a shutter dropping. */
+.rama-eye-closed {
+  fill: none;
+  stroke: #17172b;
+  stroke-width: 5;
+  stroke-linecap: round;
+  opacity: 0;
+  transition: opacity 0.06s ease-in;
+}
+
+.rama-eye-closed--on {
+  opacity: 1;
+  transition: opacity 0.05s ease-out;
+}
+
+/* A closed eye is a single curve, not an outlined oval — so the open-eye
+   line work steps out of the way for the blink frame. */
+.rama-eye--closed .rama-lash,
+.rama-eye--closed .rama-lid-lower {
+  opacity: 0;
+}
+
+.rama-brow {
+  fill: #141425;
   transform-box: fill-box;
   transform-origin: bottom center;
   transition: transform 0.25s ease;
 }
 
-.rama-nose {
+/* Nose is built from shading, not an outline */
+.rama-nose-shadow {
+  fill: #4f8cba;
+  opacity: 0.38;
+}
+
+.rama-nose-under {
   fill: none;
-  stroke: #6fb3de;
-  stroke-width: 3;
+  stroke: #3f7ba9;
+  stroke-width: 2.6;
   stroke-linecap: round;
-  opacity: 0.8;
+  opacity: 0.7;
+}
+
+.rama-nose-light {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 2;
+  stroke-linecap: round;
+  opacity: 0.45;
 }
 
 .rama-mouth {
-  fill: #a63a3a;
+  fill: url(#ramaMouthInner);
   stroke: none;
-  transition: d 0.08s ease;
+  transition: d 0.09s ease;
 }
 
-.rama-frame:hover .rama-brow-left { transform: translateY(-3px) rotate(-2deg); }
-.rama-frame:hover .rama-brow-right { transform: translateY(-3px) rotate(2deg); }
+/* Upper lip, drawn heavier than the lower one so the mouth has a
+   definite top edge whatever shape it holds. */
+.rama-mouth-line {
+  fill: none;
+  stroke: #5a1f28;
+  stroke-width: 3;
+  stroke-linecap: round;
+  transition: d 0.09s ease;
+}
+
+.rama-lip-shadow {
+  fill: #4f8cba;
+  opacity: 0.32;
+}
+
+.rama-lip-lower {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  opacity: 0.5;
+}
+
+.rama-hair-shine {
+  animation: bunSway 5s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: bottom center;
+}
+
+/* Both brows are drawn from the same path, the right one mirrored, so
+   they share one hover transform and stay symmetrical on screen. */
+.rama-frame:hover .rama-brow { transform: translateY(-3.5px) rotate(-2deg); }
 
 /* Gentle bun/hair sway so the character never feels frozen */
 .rama-bun,
