@@ -131,10 +131,12 @@ export default function App() {
 
       {/* CENTER STAGE */}
       <div className="avatar-stage">
-        <SpeechBubble message={message} visible={bubbleVisible} />
+        <div className="rama-anchor">
+          <SpeechBubble message={message} visible={bubbleVisible} />
 
-        <div className="rama-clickable" onClick={handleRamaClick} title="Click for wisdom">
-          <Rama mood={mood} />
+          <div className="rama-clickable" onClick={handleRamaClick} title="Click for wisdom">
+            <Rama mood={mood} />
+          </div>
         </div>
 
         <div className="rama-chat">
