@@ -1,13 +1,15 @@
-// Rama component — interactive semi-realistic avatar
+// Rama component — interactive avatar
 // A single hand-built SVG face rig, framed like an app-icon badge.
 // Eyes track the cursor, the character blinks on its own, and the
 // mouth animates while Rama is speaking — all driven imperatively via
 // refs so idle tracking never triggers a React re-render.
 //
-// Lighting convention: one key light from the upper left. Soft shading
-// is painted as plain shapes inside two blurred groups (shadow and
-// highlight) clipped to the face, so the whole face costs two blur passes
-// rather than one per shape.
+// Proportions follow a realistic head: eyes on the vertical midline of
+// the head and one eye-width apart, brow / nose base / chin splitting the
+// face in thirds, ears spanning brow to nose. Rendering is matte cel
+// shading — thin line art, one soft shadow tone, almost no highlights.
+// Soft shading is painted as plain shapes inside one blurred group clipped
+// to the face, so it costs a single blur pass.
 
 import { useEffect, useRef, useState } from 'react'
 import './Rama.css'
@@ -36,44 +38,44 @@ type MouthShape = {
 }
 
 const MOUTH: Record<string, MouthShape> = {
-  idle: { x1: 139, y1: 196, x2: 181, y2: 196, top: 202, bottom: 212, open: false },
-  happy: { x1: 132, y1: 190, x2: 188, y2: 190, top: 202, bottom: 240, open: true },
-  thinking: { x1: 147, y1: 199, x2: 171, y2: 197, top: 194, bottom: 208, cx: 158, open: false },
-  amused: { x1: 130, y1: 188, x2: 190, y2: 188, top: 206, bottom: 240, open: true },
-  talkOpen: { x1: 142, y1: 191, x2: 178, y2: 191, top: 201, bottom: 236, open: true },
-  talkMid: { x1: 143, y1: 194, x2: 177, y2: 194, top: 202, bottom: 218, open: true },
-  talkClosed: { x1: 140, y1: 197, x2: 180, y2: 197, top: 203, bottom: 209, open: false },
+  idle: { x1: 143, y1: 208, x2: 177, y2: 208, top: 211, bottom: 216, open: false },
+  happy: { x1: 139, y1: 205, x2: 181, y2: 205, top: 211, bottom: 232, open: true },
+  thinking: { x1: 148, y1: 210, x2: 172, y2: 208, top: 207, bottom: 214, cx: 158, open: false },
+  amused: { x1: 138, y1: 204, x2: 182, y2: 204, top: 212, bottom: 232, open: true },
+  talkOpen: { x1: 145, y1: 206, x2: 175, y2: 206, top: 210, bottom: 228, open: true },
+  talkMid: { x1: 146, y1: 207, x2: 174, y2: 207, top: 211, bottom: 219, open: true },
+  talkClosed: { x1: 144, y1: 208, x2: 176, y2: 208, top: 211, bottom: 214, open: false },
 }
 
 const TALK_CYCLE = ['talkOpen', 'talkMid', 'talkClosed', 'talkMid'] as const
 
 function mouthPaths({ x1, y1, x2, y2, top, bottom, cx = 160, open }: MouthShape) {
-  const upperThick = open ? 5 : 6.5
-  const lowerThick = open ? 4.5 : 6
+  const upperThick = open ? 2.8 : 3.2
+  const lowerThick = open ? 3.5 : 4
   // A quadratic's midpoint sits at ¼·start + ½·control + ¼·end.
   const lineMid = (y1 + y2) / 4 + top / 2
   const openMid = (y1 + y2) / 4 + bottom / 2
   const bow = lineMid - upperThick
   const hl = openMid + lowerThick * 0.45
-  const sh = openMid + lowerThick + 3.5
+  const sh = openMid + lowerThick + 3
 
   return {
     shape: `M${x1} ${y1} Q${cx} ${bottom} ${x2} ${y2} Q${cx} ${top} ${x1} ${y1} Z`,
     line: `M${x1} ${y1} Q${cx} ${top} ${x2} ${y2}`,
     upper:
       `M${x1} ${y1} Q${cx} ${top} ${x2} ${y2} ` +
-      `C${x2 - 5} ${y2 - 3.5} ${cx + 10} ${bow} ${cx + 4.5} ${bow} ` +
-      `Q${cx} ${bow + 2.2} ${cx - 4.5} ${bow} ` +
-      `C${cx - 10} ${bow} ${x1 + 5} ${y1 - 3.5} ${x1} ${y1} Z`,
+      `C${x2 - 4} ${y2 - 2} ${cx + 8} ${bow} ${cx + 3.5} ${bow} ` +
+      `Q${cx} ${bow + 1.4} ${cx - 3.5} ${bow} ` +
+      `C${cx - 8} ${bow} ${x1 + 4} ${y1 - 2} ${x1} ${y1} Z`,
     upperLight:
-      `M${cx - 9} ${bow - 1.2} Q${cx - 4.5} ${bow - 2.4} ${cx} ${bow + 0.6} ` +
-      `Q${cx + 4.5} ${bow - 2.4} ${cx + 9} ${bow - 1.2}`,
+      `M${cx - 7} ${bow - 1} Q${cx - 3.5} ${bow - 1.8} ${cx} ${bow + 0.4} ` +
+      `Q${cx + 3.5} ${bow - 1.8} ${cx + 7} ${bow - 1}`,
     lower: `M${x1} ${y1} Q${cx} ${bottom} ${x2} ${y2} Q${cx} ${bottom + lowerThick * 2} ${x1} ${y1} Z`,
-    lowerLight: `M${cx - 6} ${hl} Q${cx} ${hl + 1.6} ${cx + 6} ${hl}`,
-    shadow: `M${cx - 11} ${sh} Q${cx} ${sh + 4} ${cx + 11} ${sh}`,
+    lowerLight: `M${cx - 5} ${hl} Q${cx} ${hl + 1.2} ${cx + 5} ${hl}`,
+    shadow: `M${cx - 8} ${sh} Q${cx} ${sh + 3} ${cx + 8} ${sh}`,
     corners:
-      `M${x1 + 1.5} ${y1 - 3} Q${x1 - 2.5} ${y1} ${x1 + 1.5} ${y1 + 3} ` +
-      `M${x2 - 1.5} ${y2 - 3} Q${x2 + 2.5} ${y2} ${x2 - 1.5} ${y2 + 3}`,
+      `M${x1 + 1} ${y1 - 2} Q${x1 - 1.8} ${y1} ${x1 + 1} ${y1 + 2} ` +
+      `M${x2 - 1} ${y2 - 2} Q${x2 + 1.8} ${y2} ${x2 - 1} ${y2 + 2}`,
   }
 }
 
@@ -81,19 +83,32 @@ type MouthPart = keyof ReturnType<typeof mouthPaths>
 const IDLE_MOUTH = mouthPaths(MOUTH.idle)
 
 // ── Static geometry ───────────────────────────────────────────
+// Long oval with a defined jaw angle and a broad chin.
 const FACE_PATH =
-  'M160 66 C204 66 222 100 222 146 C222 178 213 199 197 213 C185 223 172 229 160 229 ' +
-  'C148 229 135 223 123 213 C107 199 98 178 98 146 C98 100 116 66 160 66 Z'
+  'M160 84 C200 84 215 112 215 150 C215 180 212 196 204 209 C194 225 178 237 160 237 ' +
+  'C142 237 126 225 116 209 C108 196 105 180 105 150 C105 112 120 84 160 84 Z'
 
-const ROBE_PATH = 'M40 320 C44 262 88 240 128 232 Q160 272 192 232 C232 240 276 262 280 320 Z'
-const SASH_PATH = 'M204 234 C176 256 120 282 92 320 L150 320 C176 290 220 270 256 258 C240 244 222 236 204 234 Z'
+const NECK_PATH =
+  'M137 205 L137 238 C136 252 126 262 104 270 L104 292 L216 292 L216 270 ' +
+  'C194 262 184 252 183 238 L183 205 Z'
 
-// Almond ("lotus") eye, in left-eye coordinates.
-const EYE_X = 127
-const EYE_Y = 153
+const ROBE_PATH = 'M20 320 C28 284 70 266 118 262 Q160 300 202 262 C250 266 292 284 300 320 Z'
+const NECKLINE = 'M118 262 Q160 300 202 262'
+const SASH_PATH =
+  'M214 262 C188 282 138 300 110 320 L172 320 C196 304 232 292 266 284 C252 272 234 264 214 262 Z'
+const SASH_EDGE_A = 'M214 262 C188 282 138 300 110 320'
+const SASH_EDGE_B = 'M172 320 C196 304 232 292 266 284'
+
+// Almond eye, in left-eye coordinates. Right eye is the mirror image.
+const EYE_X = 137
+const EYE_Y = 158
 const EYE_PATH =
-  'M103 150 C109 140.5 118 137 128.5 137 C139 137 146 143 150 155 ' +
-  'C143 163 135 166.5 126 166.5 C116 166.5 108 160 103 150 Z'
+  'M125.5 158.5 C128.5 154 132.5 152.5 137 152.5 C142 152.5 145.5 155 148.5 159.5 ' +
+  'C145 162.5 141 163.8 137 163.8 C132 163.8 128 162 125.5 158.5 Z'
+
+const BROW_PATH =
+  'M151 147 C150 142.5 146 140.5 140 140 C133 139.5 126 141 120 145.5 C119 146.5 120 147.8 121.5 147.2 ' +
+  'C127 145 133 144.5 140 145.2 C145 145.6 148.5 147 150.5 148.8 C151.3 149.5 151.5 148 151 147 Z'
 
 function quadPoint(t: number, p0: number[], p1: number[], p2: number[]) {
   const u = 1 - t
@@ -103,24 +118,9 @@ function quadPoint(t: number, p0: number[], p1: number[], p2: number[]) {
   }
 }
 
-// Radial fibres of the iris, as one path.
-const IRIS_FIBERS = Array.from({ length: 32 }, (_, i) => {
-  const a = (i / 32) * Math.PI * 2
-  const r1 = 6.4
-  const r2 = 13 - (i % 3) * 1.6
-  const p = (r: number) =>
-    `${(EYE_X + Math.cos(a) * r).toFixed(2)} ${(EYE_Y + Math.sin(a) * r).toFixed(2)}`
-  return `M${p(r1)} L${p(r2)}`
-}).join(' ')
-
-// Pearl mala, leaving a gap at the centre for the pendant.
-const PEARLS = Array.from({ length: 19 }, (_, i) => i / 18)
-  .filter((t) => Math.abs(t - 0.5) > 0.06)
-  .map((t) => quadPoint(t, [124, 236], [160, 302], [196, 236]))
-
-// Jasmine string wound round the top-knot.
-const JASMINE = Array.from({ length: 9 }, (_, i) =>
-  quadPoint(i / 8, [134, 48], [160, 68], [186, 48]),
+// Rudraksha mala across the chest.
+const BEADS = Array.from({ length: 17 }, (_, i) =>
+  quadPoint(i / 16, [120, 266], [160, 322], [200, 266]),
 )
 
 const MIRROR = 'translate(320,0) scale(-1,1)'
@@ -129,8 +129,8 @@ const SHADOW = '#2d5b8a'
 // ── Eye ───────────────────────────────────────────────────────
 // Drawn in left-eye coordinates. The right eye reuses the exact geometry
 // mirrored about the face centre line (x = 160), which keeps the halves
-// symmetrical. Specular highlights are the exception: they must sit on the
-// same side on screen in both eyes, so their x is un-mirrored.
+// symmetrical. The catch-light is the exception: it must sit on the same
+// side on screen in both eyes, so its x is un-mirrored.
 function Eye({
   irisRef,
   closed,
@@ -147,114 +147,74 @@ function Eye({
       className={`rama-eye ${closed ? 'rama-eye--closed' : ''}`}
       transform={mirrored ? MIRROR : undefined}
     >
-      {/* Socket shading on the upper lid */}
-      <ellipse cx="128" cy="134" rx="26" ry="10" fill="url(#ramaLidShade)" />
+      {/* Socket shading under the brow ridge */}
+      <ellipse cx="139" cy="153" rx="15" ry="7" fill="url(#ramaLidShade)" />
 
-      {/* Lid crease — stops short of the corners so it never rings the eye */}
-      <path
-        className="rama-crease"
-        d="M109 132 C116 126.5 126 125 135 126 C142 127 147 131 149.5 137"
-      />
+      {/* Lid crease */}
+      <path className="rama-crease" d="M127.5 153 C131 148.8 135 147.8 139 148 C143 148.3 146 150 148 153" />
 
       <g clipPath="url(#ramaEyeClip)">
-        {/* Sclera, greying towards the corners */}
         <path d={EYE_PATH} fill="url(#ramaEyeWhite)" />
 
-        {/* Caruncle — the pink inner corner */}
-        <ellipse cx="148" cy="155" rx="2.6" ry="3.2" fill="#d990a6" opacity="0.55" />
+        {/* Caruncle — the inner corner */}
+        <ellipse cx="148" cy="159.3" rx="1.6" ry="2" fill="#c98a9c" opacity="0.5" />
 
-        {/* Iris — this group is what tracks the cursor. It is slightly
-            taller than the opening, so both lids rest on it. */}
+        {/* Iris — this group is what tracks the cursor. It is taller than
+            the opening, so both lids rest on it. */}
         <g ref={irisRef} className="rama-iris">
-          <circle cx={EYE_X} cy={EYE_Y} r="14.5" fill="url(#ramaIris)" />
-          <path d={IRIS_FIBERS} className="rama-iris-fibers" />
-          {/* Light bouncing up through the lower half of the iris */}
-          <ellipse cx={EYE_X} cy={EYE_Y + 7} rx="9" ry="5" fill="#f0b877" opacity="0.4" />
-          {/* Collarette and limbal ring */}
-          <circle cx={EYE_X} cy={EYE_Y} r="7.4" fill="none" stroke="#e0a868" strokeWidth="1.3" opacity="0.45" />
-          <circle cx={EYE_X} cy={EYE_Y} r="13.4" fill="none" stroke="#1a0d05" strokeWidth="1.8" opacity="0.7" />
-          <circle cx={EYE_X} cy={EYE_Y} r="5.4" fill="#0e0704" />
-          {/* Specular highlights: a window-shaped key light and a small fill */}
-          <ellipse cx={hx(-5.4)} cy={EYE_Y - 6.4} rx="3.8" ry="3.2" fill="#ffffff" opacity="0.95" />
-          <circle cx={hx(6)} cy={EYE_Y + 6} r="1.7" fill="#ffffff" opacity="0.7" />
+          <circle cx={EYE_X} cy={EYE_Y} r="5.6" fill="url(#ramaIris)" />
+          <ellipse cx={EYE_X} cy={EYE_Y + 2.4} rx="3.2" ry="1.8" fill="#c08a52" opacity="0.25" />
+          <circle cx={EYE_X} cy={EYE_Y} r="5.2" fill="none" stroke="#1a0f08" strokeWidth="0.8" opacity="0.7" />
+          <circle cx={EYE_X} cy={EYE_Y} r="2.3" fill="#0e0805" />
+          <circle cx={hx(-1.9)} cy={EYE_Y - 2} r="1.1" fill="#ffffff" opacity="0.8" />
         </g>
 
         {/* Shadow the upper lid casts on the eyeball */}
-        <rect x="100" y="134" width="54" height="15" fill="url(#ramaLidCast)" />
+        <rect x="122" y="152" width="30" height="5" fill="url(#ramaLidCast)" />
 
         {/* Blink lid — scales down from the top, clipped to the eye */}
         <rect
           className={`rama-eyelid ${closed ? 'rama-eyelid--closed' : ''}`}
-          x="100" y="132" width="54" height="40"
+          x="122" y="150" width="30" height="16"
           fill="url(#ramaSkin)"
         />
       </g>
 
-      {/* Lower lid */}
       <path
         className="rama-lid-lower"
-        d="M108 158 C114 165.5 121 168.8 129 168.8 C137 168.8 144 165 149.5 158.5"
+        d="M127.5 161.5 C131 164.5 134 165.5 137.5 165.5 C141 165.5 144 164 147.5 161.5"
       />
-
-      {/* Upper lash line — a heavier overdraw on the outer third fakes the
-          taper of a brush stroke, and a few lashes grow out of it. */}
       <path
         className="rama-lash"
-        d="M101.5 150.5 C108 139 117 135 128.5 135 C140 135 147.5 142 151.5 156"
-      />
-      <path className="rama-lash rama-lash--outer" d="M101.5 150.5 C105 143 110 138.5 118 136.2" />
-      <path
-        className="rama-lash rama-lash--single"
-        d="M104.5 147 L97.5 142.5 M108.5 142 L103 136.8 M113.5 138.4 L110.5 132.6"
+        d="M124.5 158.8 C128 153.2 132.5 151.2 137 151.2 C142.5 151.2 146 154 149.5 159.5"
       />
 
       {/* Closed-eye curve, cross-faded in on a blink */}
       <path
         className={`rama-eye-closed ${closed ? 'rama-eye-closed--on' : ''}`}
-        d="M102 151 C112 161 138 163.5 151 156"
+        d="M125 158.5 C131 161.8 143 162.2 149 159.5"
       />
     </g>
   )
 }
 
-// ── Ear with kundala earring (left-ear coordinates) ──────────
+// ── Ear with a small gold kundala (left-ear coordinates) ─────
 function Ear({ mirrored = false }: { mirrored?: boolean }) {
   return (
     <g transform={mirrored ? MIRROR : undefined}>
       <path
         className="rama-ear"
-        d="M99 141 C90 136 80 141 79 152 C78 163 82 171 88 175 C92 178 96 176 99 172 Z"
+        d="M108 148 C100 138 89 141 89.5 155 C90 169 95 182 103 188 C106.5 190.5 109 187 109 183 Z"
         fill="url(#ramaSkin)"
       />
-      <ellipse cx="92.5" cy="157" rx="4.2" ry="6.5" fill={SHADOW} opacity="0.32" />
-      <path className="rama-ear-fold" d="M96 144.5 C88.5 141.5 83.5 146.5 84 154 C84.5 161 87.5 166 91.5 169" />
-      <path d="M88.5 150 C86.5 155 87.5 160.5 90.5 164" fill="none" stroke="#ffffff" strokeWidth="1.4" strokeLinecap="round" opacity="0.35" />
+      <ellipse cx="101" cy="163" rx="3.2" ry="7" fill={SHADOW} opacity="0.28" />
+      <path className="rama-ear-fold" d="M105 145 C97 142.5 93 148 93.5 156 C94 166 97.5 176 102 181" />
 
       <g className="rama-earring">
-        <circle cx="88" cy="174.5" r="3.2" fill="url(#ramaGold)" stroke="#8a5a0a" strokeWidth="0.8" />
-        <circle cx="88" cy="185" r="7.2" fill="none" stroke="#8a5a0a" strokeWidth="4.4" />
-        <circle cx="88" cy="185" r="7.2" fill="none" stroke="url(#ramaGold)" strokeWidth="3" />
-        <path d="M84 180.5 Q86.5 178.8 89.5 179.2" fill="none" stroke="#fff6c2" strokeWidth="1.1" strokeLinecap="round" opacity="0.8" />
-        <ellipse cx="88" cy="195.5" rx="2.8" ry="3.8" fill="url(#ramaRuby)" stroke="#8a5a0a" strokeWidth="0.8" />
-        <circle cx="88" cy="201.5" r="1.8" fill="#fbf7ee" />
+        <circle cx="101" cy="188.5" r="1.8" fill="url(#ramaGold)" />
+        <circle cx="101" cy="194.5" r="4" fill="none" stroke="#7a5212" strokeWidth="2.8" />
+        <circle cx="101" cy="194.5" r="4" fill="none" stroke="url(#ramaGold)" strokeWidth="1.8" />
       </g>
-    </g>
-  )
-}
-
-// ── Front lock of hair, swept from the centre parting (left side) ──
-function FrontLock({ mirrored = false }: { mirrored?: boolean }) {
-  return (
-    <g transform={mirrored ? MIRROR : undefined}>
-      <path
-        d="M159 68 C138 66 114 74 104 98 C99 110 97.5 124 98.5 139 C102.5 128 108 118 116 110 C126 100 141 92 158.5 88.5 Z"
-        fill="url(#ramaHair)"
-      />
-      <path
-        className="rama-hair-strands"
-        d="M155 74 C136 76 118 86 108 108 M151 81 C134 85 120 96 110 118 M140 78 C124 84 112 96 104 120 M156 86 C138 90 122 100 114 112"
-      />
-      <path className="rama-hair-sheen" d="M150 75 C134 78 121 86 113 97" />
     </g>
   )
 }
@@ -272,7 +232,7 @@ export default function Rama({ mood = 'idle' }: RamaProps) {
 
   // ── Eyes track the cursor ──────────────────────────────────
   useEffect(() => {
-    const maxOffset = 3.2
+    const maxOffset = 1.6
     let raf = 0
 
     const handleMove = (e: MouseEvent) => {
@@ -286,13 +246,13 @@ export default function Rama({ mood = 'idle' }: RamaProps) {
 
         const rect = svg.getBoundingClientRect()
         const cx = rect.left + rect.width / 2
-        const cy = rect.top + rect.height * 0.47
+        const cy = rect.top + rect.height * 0.49
 
         const dx = e.clientX - cx
         const dy = e.clientY - cy
         const dist = Math.hypot(dx, dy) || 1
-        const ox = (dx / dist) * Math.min(maxOffset, dist / 40)
-        const oy = (dy / dist) * Math.min(maxOffset, dist / 40)
+        const ox = (dx / dist) * Math.min(maxOffset, dist / 60)
+        const oy = (dy / dist) * Math.min(maxOffset, dist / 60)
 
         leftIris.setAttribute('transform', `translate(${ox} ${oy})`)
         // The right eye lives inside a mirrored group, so its local x axis
@@ -381,112 +341,91 @@ export default function Rama({ mood = 'idle' }: RamaProps) {
               <stop offset="100%" stopColor="var(--rama-frame-bottom)" />
             </linearGradient>
             <radialGradient id="ramaHalo" cx="0.5" cy="0.5" r="0.5">
-              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.75" />
-              <stop offset="70%" stopColor="#ffffff" stopOpacity="0.25" />
+              <stop offset="0%" stopColor="#ffffff" stopOpacity="0.5" />
+              <stop offset="70%" stopColor="#ffffff" stopOpacity="0.15" />
               <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
             </radialGradient>
 
-            {/* Soft-shading blurs. User-space regions so blurred edges are
+            {/* Soft-shading blur. A user-space region so blurred edges are
                 never cropped to a shape's bounding box. */}
             <filter id="ramaBlur" filterUnits="userSpaceOnUse" x="0" y="0" width="320" height="320">
-              <feGaussianBlur stdDeviation="4.5" />
+              <feGaussianBlur stdDeviation="3.5" />
             </filter>
             <filter id="ramaBlurSm" filterUnits="userSpaceOnUse" x="0" y="0" width="320" height="320">
-              <feGaussianBlur stdDeviation="1.6" />
+              <feGaussianBlur stdDeviation="1.2" />
             </filter>
 
             {/* Skin runs in user space so face, ears, neck and eyelids all
-                sample the same ramp and stay seamless. */}
-            <linearGradient id="ramaSkin" gradientUnits="userSpaceOnUse" x1="0" y1="60" x2="0" y2="250">
-              <stop offset="0%" stopColor="#d9eeff" />
-              <stop offset="45%" stopColor="#b6dbf8" />
-              <stop offset="100%" stopColor="#80b6e0" />
+                sample the same ramp and stay seamless. Kept flat — a matte
+                cel look rather than a glossy one. */}
+            <linearGradient id="ramaSkin" gradientUnits="userSpaceOnUse" x1="0" y1="80" x2="0" y2="290">
+              <stop offset="0%" stopColor="#9ccbf2" />
+              <stop offset="55%" stopColor="#88bdea" />
+              <stop offset="100%" stopColor="#74abdc" />
             </linearGradient>
 
-            <radialGradient id="ramaEyeWhite" gradientUnits="userSpaceOnUse" cx="126" cy="152" r="26">
-              <stop offset="0%" stopColor="#ffffff" />
-              <stop offset="55%" stopColor="#f3f7fb" />
-              <stop offset="100%" stopColor="#b9cadd" />
+            <radialGradient id="ramaEyeWhite" gradientUnits="userSpaceOnUse" cx="137" cy="158" r="13">
+              <stop offset="0%" stopColor="#f3f5f7" />
+              <stop offset="60%" stopColor="#e4e9ef" />
+              <stop offset="100%" stopColor="#b3c0d0" />
             </radialGradient>
             <linearGradient id="ramaLidCast" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#1e2a44" stopOpacity="0.5" />
+              <stop offset="0%" stopColor="#1e2a44" stopOpacity="0.45" />
               <stop offset="100%" stopColor="#1e2a44" stopOpacity="0" />
             </linearGradient>
-            <radialGradient id="ramaLidShade" cx="0.55" cy="0.6" r="0.5">
-              <stop offset="0%" stopColor="#4a6fa8" stopOpacity="0.38" />
-              <stop offset="100%" stopColor="#4a6fa8" stopOpacity="0" />
+            <radialGradient id="ramaLidShade" cx="0.55" cy="0.55" r="0.5">
+              <stop offset="0%" stopColor={SHADOW} stopOpacity="0.3" />
+              <stop offset="100%" stopColor={SHADOW} stopOpacity="0" />
             </radialGradient>
 
-            <radialGradient id="ramaIris" cx="0.5" cy="0.4" r="0.62">
-              <stop offset="0%" stopColor="#c68a4a" />
-              <stop offset="40%" stopColor="#8a5226" />
-              <stop offset="85%" stopColor="#4a2a12" />
-              <stop offset="100%" stopColor="#24130a" />
+            <radialGradient id="ramaIris" cx="0.5" cy="0.45" r="0.55">
+              <stop offset="0%" stopColor="#8f643c" />
+              <stop offset="60%" stopColor="#5e3c20" />
+              <stop offset="100%" stopColor="#35220f" />
             </radialGradient>
 
-            <radialGradient id="ramaBlush" cx="0.5" cy="0.5" r="0.5">
-              <stop offset="0%" stopColor="#9a86e8" stopOpacity="0.4" />
-              <stop offset="100%" stopColor="#9a86e8" stopOpacity="0" />
-            </radialGradient>
-
-            <linearGradient id="ramaMouthInner" gradientUnits="userSpaceOnUse" x1="0" y1="186" x2="0" y2="228">
-              <stop offset="0%" stopColor="#5d1b26" />
-              <stop offset="100%" stopColor="#2e0f16" />
+            <linearGradient id="ramaMouthInner" gradientUnits="userSpaceOnUse" x1="0" y1="204" x2="0" y2="232">
+              <stop offset="0%" stopColor="#4a2230" />
+              <stop offset="100%" stopColor="#2a1119" />
             </linearGradient>
-            <linearGradient id="ramaTeeth" gradientUnits="userSpaceOnUse" x1="0" y1="184" x2="0" y2="204">
-              <stop offset="0%" stopColor="#cfc6d6" />
-              <stop offset="45%" stopColor="#fdfcff" />
-              <stop offset="100%" stopColor="#e6e0ea" />
+            <linearGradient id="ramaTeeth" gradientUnits="userSpaceOnUse" x1="0" y1="203" x2="0" y2="214">
+              <stop offset="0%" stopColor="#c9c3cc" />
+              <stop offset="50%" stopColor="#f2f0f2" />
+              <stop offset="100%" stopColor="#dcd7de" />
             </linearGradient>
-            <linearGradient id="ramaLipUpper" gradientUnits="userSpaceOnUse" x1="0" y1="186" x2="0" y2="202">
-              <stop offset="0%" stopColor="#a86a8a" />
-              <stop offset="100%" stopColor="#7c3f5e" />
+            <linearGradient id="ramaLipUpper" gradientUnits="userSpaceOnUse" x1="0" y1="202" x2="0" y2="212">
+              <stop offset="0%" stopColor="#7d6a92" />
+              <stop offset="100%" stopColor="#62517a" />
             </linearGradient>
-            <linearGradient id="ramaLipLower" gradientUnits="userSpaceOnUse" x1="0" y1="198" x2="0" y2="222">
-              <stop offset="0%" stopColor="#8e4b6c" />
-              <stop offset="45%" stopColor="#b77a97" />
-              <stop offset="100%" stopColor="#9a5a7a" />
+            <linearGradient id="ramaLipLower" gradientUnits="userSpaceOnUse" x1="0" y1="208" x2="0" y2="226">
+              <stop offset="0%" stopColor="#6a5a86" />
+              <stop offset="100%" stopColor="#8573a0" />
             </linearGradient>
 
-            <linearGradient id="ramaHair" gradientUnits="userSpaceOnUse" x1="0" y1="20" x2="0" y2="250">
-              <stop offset="0%" stopColor="#2a2a4c" />
-              <stop offset="40%" stopColor="#17172b" />
-              <stop offset="100%" stopColor="#0b0b16" />
-            </linearGradient>
-            <linearGradient id="ramaHairShine" gradientUnits="userSpaceOnUse" x1="100" y1="0" x2="220" y2="0">
-              <stop offset="0%" stopColor="#6a6aa8" stopOpacity="0" />
-              <stop offset="50%" stopColor="#7a7ab8" stopOpacity="0.7" />
-              <stop offset="100%" stopColor="#6a6aa8" stopOpacity="0" />
+            <linearGradient id="ramaHair" gradientUnits="userSpaceOnUse" x1="0" y1="20" x2="0" y2="170">
+              <stop offset="0%" stopColor="#3a2d22" />
+              <stop offset="50%" stopColor="#2a2018" />
+              <stop offset="100%" stopColor="#1a130e" />
             </linearGradient>
 
             <linearGradient id="ramaGold" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#fff2a8" />
-              <stop offset="45%" stopColor="#f3c13f" />
-              <stop offset="100%" stopColor="#b27a12" />
+              <stop offset="0%" stopColor="#f2d27a" />
+              <stop offset="55%" stopColor="#d4a43a" />
+              <stop offset="100%" stopColor="#9a6c18" />
             </linearGradient>
-            <radialGradient id="ramaRuby" cx="0.38" cy="0.32" r="0.7">
-              <stop offset="0%" stopColor="#ff9aa8" />
-              <stop offset="40%" stopColor="#d9122f" />
-              <stop offset="100%" stopColor="#6a0414" />
-            </radialGradient>
-            <radialGradient id="ramaPearl" cx="0.35" cy="0.3" r="0.75">
-              <stop offset="0%" stopColor="#ffffff" />
-              <stop offset="60%" stopColor="#f4efe4" />
-              <stop offset="100%" stopColor="#c9bfae" />
+            <radialGradient id="ramaBead" cx="0.4" cy="0.35" r="0.7">
+              <stop offset="0%" stopColor="#9a5c34" />
+              <stop offset="70%" stopColor="#6b3b1e" />
+              <stop offset="100%" stopColor="#40220f" />
             </radialGradient>
 
-            <linearGradient id="ramaRobe" gradientUnits="userSpaceOnUse" x1="0" y1="232" x2="0" y2="320">
-              <stop offset="0%" stopColor="#ffa24a" />
-              <stop offset="100%" stopColor="#e86a0a" />
+            <linearGradient id="ramaRobe" gradientUnits="userSpaceOnUse" x1="0" y1="262" x2="0" y2="320">
+              <stop offset="0%" stopColor="#f59a44" />
+              <stop offset="100%" stopColor="#dd6a12" />
             </linearGradient>
-            <linearGradient id="ramaSilk" gradientUnits="userSpaceOnUse" x1="250" y1="240" x2="100" y2="320">
-              <stop offset="0%" stopColor="#ffe27a" />
-              <stop offset="55%" stopColor="#f9c43a" />
-              <stop offset="100%" stopColor="#e39a14" />
-            </linearGradient>
-            <linearGradient id="ramaBand" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="#ff5a66" />
-              <stop offset="100%" stopColor="#b81f2e" />
+            <linearGradient id="ramaSilk" gradientUnits="userSpaceOnUse" x1="260" y1="270" x2="110" y2="320">
+              <stop offset="0%" stopColor="#f6d66e" />
+              <stop offset="100%" stopColor="#e0a52c" />
             </linearGradient>
 
             <clipPath id="ramaFrameClip">
@@ -495,14 +434,14 @@ export default function Rama({ mood = 'idle' }: RamaProps) {
             <clipPath id="ramaFaceClip">
               <path d={FACE_PATH} />
             </clipPath>
+            <clipPath id="ramaNeckClip">
+              <path d={NECK_PATH} />
+            </clipPath>
             <clipPath id="ramaRobeClip">
               <path d={ROBE_PATH} />
             </clipPath>
             <clipPath id="ramaSashClip">
               <path d={SASH_PATH} />
-            </clipPath>
-            <clipPath id="ramaNeckClip">
-              <path d="M143 186 L143 222 C142 236 136 248 122 256 L198 256 C184 248 178 236 177 222 L177 186 Z" />
             </clipPath>
 
             {/* Left-eye geometry; the mirrored right eye reuses it because a
@@ -521,192 +460,144 @@ export default function Rama({ mood = 'idle' }: RamaProps) {
 
           <g clipPath="url(#ramaFrameClip)">
             {/* Halo — a soft disc of light with a fine gilt ring */}
-            <circle cx="160" cy="134" r="128" fill="url(#ramaHalo)" />
-            <circle cx="160" cy="134" r="106" fill="none" stroke="#e8b43c" strokeWidth="1.4" opacity="0.4" />
-            <circle cx="160" cy="134" r="113" fill="none" stroke="#e8b43c" strokeWidth="2" strokeDasharray="0.1 7" strokeLinecap="round" opacity="0.5" />
+            <circle cx="160" cy="140" r="130" fill="url(#ramaHalo)" />
+            <circle cx="160" cy="140" r="116" fill="none" stroke="#d4a43a" strokeWidth="1.2" opacity="0.35" />
 
             {/* ── Neck ── */}
-            <g>
-              <path
-                d="M143 186 L143 222 C142 236 136 248 122 256 L198 256 C184 248 178 236 177 222 L177 186 Z"
-                fill="url(#ramaSkin)"
-              />
-              <g clipPath="url(#ramaNeckClip)">
-                <g filter="url(#ramaBlur)" fill={SHADOW}>
-                  {/* Chin's cast shadow, and the side turned from the light */}
-                  <path d="M136 196 Q160 232 184 196 L184 214 Q160 240 136 214 Z" opacity="0.55" />
-                  <rect x="170" y="190" width="14" height="60" opacity="0.3" />
-                  <ellipse cx="160" cy="246" rx="5" ry="4" opacity="0.4" />
-                </g>
-                <path className="rama-neck-line" d="M150 216 C152 228 155 238 158 245 M170 216 C168 228 165 238 162 245" />
-                <path className="rama-neck-line" d="M134 247 Q145 242.5 155 245.5 M186 247 Q175 242.5 165 245.5" />
+            <path className="rama-skin-line" d={NECK_PATH} fill="url(#ramaSkin)" />
+            <g clipPath="url(#ramaNeckClip)">
+              <g filter="url(#ramaBlur)" fill={SHADOW}>
+                {/* Jaw's cast shadow, and the side turned from the light */}
+                <path d="M128 205 Q160 250 192 205 L192 222 Q160 262 128 222 Z" opacity="0.5" />
+                <rect x="172" y="205" width="12" height="70" opacity="0.28" />
+                <ellipse cx="160" cy="274" rx="5" ry="3.5" opacity="0.35" />
               </g>
+              <path className="rama-neck-line" d="M142 222 C146 238 152 252 157 266 M178 222 C174 238 168 252 163 266" />
+              <path className="rama-neck-line" d="M156 248 Q160 244 164 248" />
+              <path className="rama-neck-line" d="M126 276 Q140 270 154 273 M194 276 Q180 270 166 273" />
             </g>
 
             {/* ── Robe ── */}
-            <path className="rama-robe" d={ROBE_PATH} fill="url(#ramaRobe)" />
+            <path d={ROBE_PATH} fill="url(#ramaRobe)" />
             <g clipPath="url(#ramaRobeClip)">
-              <g filter="url(#ramaBlur)">
-                <path d="M66 320 C72 290 90 266 116 252" fill="none" stroke="#a33f00" strokeWidth="7" opacity="0.35" />
-                <path d="M254 320 C248 292 234 270 212 256" fill="none" stroke="#a33f00" strokeWidth="8" opacity="0.35" />
-                <path d="M84 304 C92 282 106 266 124 256" fill="none" stroke="#ffe0b0" strokeWidth="5" opacity="0.4" />
-                <ellipse cx="86" cy="262" rx="28" ry="9" fill="#ffd9a8" opacity="0.4" />
-                <path d="M128 232 Q160 272 192 232" fill="none" stroke="#7a2c00" strokeWidth="8" opacity="0.3" />
+              <g filter="url(#ramaBlur)" fill="none">
+                <path d="M58 320 C66 296 86 278 112 268" stroke="#9a3c00" strokeWidth="7" opacity="0.3" />
+                <path d="M262 320 C256 298 240 280 216 270" stroke="#9a3c00" strokeWidth="8" opacity="0.3" />
+                <path d="M78 312 C88 294 102 280 120 272" stroke="#ffd9a8" strokeWidth="4" opacity="0.25" />
+                <path d={NECKLINE} stroke="#7a2c00" strokeWidth="7" opacity="0.3" />
               </g>
             </g>
-            {/* Gold neckline trim with a beaded inner edge */}
-            <path d="M128 232 Q160 272 192 232" fill="none" stroke="#8a5a0a" strokeWidth="7.5" strokeLinecap="round" />
-            <path d="M128 232 Q160 272 192 232" fill="none" stroke="url(#ramaGold)" strokeWidth="5.5" strokeLinecap="round" />
-            <path d="M128 232 Q160 272 192 232" fill="none" stroke="#fff4b8" strokeWidth="1.8" strokeDasharray="0.1 4.5" strokeLinecap="round" />
+            {/* Gold neckline trim */}
+            <path d={NECKLINE} fill="none" stroke="#7a5212" strokeWidth="6" strokeLinecap="round" />
+            <path d={NECKLINE} fill="none" stroke="url(#ramaGold)" strokeWidth="4.2" strokeLinecap="round" />
 
-            {/* Uttariya — yellow silk shawl over the left shoulder */}
+            {/* Uttariya — silk shawl over the left shoulder */}
             <path d={SASH_PATH} fill="url(#ramaSilk)" />
             <g clipPath="url(#ramaSashClip)">
-              <g filter="url(#ramaBlur)">
-                <path d="M118 320 C140 294 178 272 224 256" fill="none" stroke="#a86400" strokeWidth="6" opacity="0.35" />
-                <path d="M102 320 C124 292 160 270 208 248" fill="none" stroke="#fff6c8" strokeWidth="5" opacity="0.55" />
-                <path d="M136 320 C156 300 190 282 240 262" fill="none" stroke="#fff6c8" strokeWidth="3" opacity="0.4" />
+              <g filter="url(#ramaBlur)" fill="none">
+                <path d="M132 320 C156 300 196 286 236 276" stroke="#a06000" strokeWidth="5" opacity="0.3" />
+                <path d="M118 320 C142 300 178 284 222 268" stroke="#fff2c0" strokeWidth="4" opacity="0.35" />
               </g>
-              {/* Woven border motif */}
-              <path d="M204 234 C176 256 120 282 92 320" fill="none" stroke="#c0392b" strokeWidth="6" />
-              <path d="M204 234 C176 256 120 282 92 320" fill="none" stroke="url(#ramaGold)" strokeWidth="3" strokeDasharray="4 3" />
-              <path d="M150 320 C176 290 220 270 256 258" fill="none" stroke="#c0392b" strokeWidth="6" />
-              <path d="M150 320 C176 290 220 270 256 258" fill="none" stroke="url(#ramaGold)" strokeWidth="3" strokeDasharray="4 3" />
+              {/* Woven border */}
+              <path d={SASH_EDGE_A} fill="none" stroke="#a8322a" strokeWidth="5" />
+              <path d={SASH_EDGE_A} fill="none" stroke="url(#ramaGold)" strokeWidth="2.4" strokeDasharray="4 3" />
+              <path d={SASH_EDGE_B} fill="none" stroke="#a8322a" strokeWidth="5" />
+              <path d={SASH_EDGE_B} fill="none" stroke="url(#ramaGold)" strokeWidth="2.4" strokeDasharray="4 3" />
             </g>
 
-            {/* ── Jewellery on the chest ── */}
-            {/* Fine gold chain on the neck */}
-            <path d="M140 236 Q160 258 180 236" fill="none" stroke="#8a5a0a" strokeWidth="2.6" />
-            <path d="M140 236 Q160 258 180 236" fill="none" stroke="#f6cf55" strokeWidth="1.6" strokeDasharray="1.6 1.2" />
-            {/* Pearl mala */}
+            {/* Rudraksha mala */}
             <g className="rama-mala">
-              {PEARLS.map((p, i) => (
-                <circle key={i} cx={p.x.toFixed(2)} cy={p.y.toFixed(2)} r="3.1" fill="url(#ramaPearl)" stroke="#9c8f7a" strokeWidth="0.5" />
+              {BEADS.map((p, i) => (
+                <g key={i}>
+                  <circle cx={p.x.toFixed(2)} cy={p.y.toFixed(2)} r="3.3" fill="url(#ramaBead)" stroke="#2e1708" strokeWidth="0.6" />
+                  <path
+                    d={`M${(p.x - 1.6).toFixed(2)} ${p.y.toFixed(2)} L${(p.x + 1.6).toFixed(2)} ${p.y.toFixed(2)} M${p.x.toFixed(2)} ${(p.y - 1.6).toFixed(2)} L${p.x.toFixed(2)} ${(p.y + 1.6).toFixed(2)}`}
+                    stroke="#2e1708" strokeWidth="0.5" opacity="0.6"
+                  />
+                </g>
               ))}
-              <circle cx="160" cy="262.5" r="2.4" fill="none" stroke="url(#ramaGold)" strokeWidth="1.6" />
-              <path
-                d="M160 264 C167 270 167.5 281 160 287 C152.5 281 153 270 160 264 Z"
-                fill="url(#ramaGold)" stroke="#8a5a0a" strokeWidth="1"
-              />
-              <ellipse cx="160" cy="276" rx="3.2" ry="4.6" fill="url(#ramaRuby)" />
-              <circle cx="160" cy="289.5" r="2" fill="url(#ramaPearl)" />
             </g>
 
-            {/* ── Back hair, falling behind the shoulders ── */}
-            <g className="rama-hair-back">
-              <path
-                d="M160 46
-                   Q96 50 88 118
-                   Q84 168 94 226
-                   Q102 256 124 236
-                   Q112 176 118 130
-                   Q122 88 160 82
-                   Q198 88 202 130
-                   Q208 176 196 236
-                   Q218 256 226 226
-                   Q236 168 232 118
-                   Q224 50 160 46 Z"
-                fill="url(#ramaHair)"
-              />
-              <path className="rama-hair-strands" d="M104 90 Q92 140 98 206 M110 104 Q100 160 106 232 M116 118 Q108 170 114 236 M98 130 Q94 176 100 224" />
-              <path className="rama-hair-strands" transform={MIRROR} d="M104 90 Q92 140 98 206 M110 104 Q100 160 106 232 M116 118 Q108 170 114 236 M98 130 Q94 176 100 224" />
-              <path className="rama-hair-sheen" d="M98 112 Q92 150 96 188" />
-            </g>
+            {/* ── Back of the head: hair seen behind the ears ── */}
+            <path
+              d="M104 168 C94 116 114 62 160 62 C206 62 226 116 216 168 C212 176 206 176 204 168 L116 168 C114 176 108 176 104 168 Z"
+              fill="url(#ramaHair)"
+            />
 
             {/* ── Ears ── */}
             <Ear />
             <Ear mirrored />
 
             {/* ── Face ── */}
-            <path className="rama-face-shape" d={FACE_PATH} fill="url(#ramaSkin)" />
+            <path className="rama-skin-line" d={FACE_PATH} fill="url(#ramaSkin)" />
 
             <g clipPath="url(#ramaFaceClip)">
-              {/* Shadows: hairline, temples, cheekbones, jaw, eye sockets,
-                  the shaded side of the nose and its cast shadow. */}
+              {/* Shadows: hairline, temples, cheekbone hollows, jaw, eye
+                  sockets, the shaded side of the nose and its cast shadow. */}
               <g filter="url(#ramaBlur)" fill="none" stroke={SHADOW}>
-                <path d="M99 142 C104 116 124 98 158 90 M162 90 C196 98 216 116 221 142" strokeWidth="9" opacity="0.4" />
-                <path d="M106 178 C114 196 128 206 142 212 M214 178 C206 196 192 206 178 212" strokeWidth="8" opacity="0.2" />
-                <path d="M102 172 C110 204 136 224 160 226 C184 224 210 204 218 172" strokeWidth="11" opacity="0.32" />
-                <path d="M165.5 146 C167.5 158 168.5 166 168 175" strokeWidth="4" opacity="0.38" />
-                <path d="M154.5 148 C153 158 152.5 166 153 174" strokeWidth="3" opacity="0.16" />
+                <path d="M108 150 C112 128 124 110 140 106 C150 104 170 104 180 106 C196 110 208 128 212 150" strokeWidth="8" opacity="0.3" />
+                <path d="M114 186 C122 202 134 210 146 214 M206 186 C198 202 186 210 174 214" strokeWidth="6" opacity="0.2" />
+                <path d="M108 180 C114 208 138 232 160 234 C182 232 206 208 212 180" strokeWidth="10" opacity="0.3" />
+                <path d="M164 160 C166 170 167.5 178 168 186" strokeWidth="3.5" opacity="0.3" />
                 <g stroke="none" fill={SHADOW}>
-                  <ellipse cx="104" cy="150" rx="9" ry="30" opacity="0.28" />
-                  <ellipse cx="216" cy="152" rx="12" ry="34" opacity="0.36" />
-                  <ellipse cx="152" cy="141" rx="5" ry="9" opacity="0.3" />
-                  <ellipse cx="168" cy="141" rx="5" ry="9" opacity="0.38" />
-                  <ellipse cx="161" cy="186.5" rx="7" ry="3" opacity="0.4" />
-                  <ellipse cx="160" cy="189" rx="2.4" ry="4" opacity="0.2" />
+                  <ellipse cx="109" cy="160" rx="7" ry="26" opacity="0.22" />
+                  <ellipse cx="211" cy="160" rx="8" ry="28" opacity="0.3" />
+                  <ellipse cx="151" cy="154" rx="3.6" ry="7" opacity="0.25" />
+                  <ellipse cx="169" cy="154" rx="3.6" ry="7" opacity="0.3" />
+                  <ellipse cx="160.5" cy="197" rx="6" ry="2.4" opacity="0.35" />
                 </g>
-              </g>
-
-              {/* Highlights: forehead, nose bridge and tip, cheeks, chin,
-                  and a rim of light along the lit edge. */}
-              <g filter="url(#ramaBlur)" fill="#ffffff">
-                <ellipse cx="146" cy="104" rx="20" ry="8" opacity="0.5" />
-                <ellipse cx="158.5" cy="160" rx="2.4" ry="12" opacity="0.55" />
-                <ellipse cx="158.5" cy="174" rx="3.6" ry="2.6" opacity="0.7" />
-                <ellipse cx="124" cy="178" rx="11" ry="6" opacity="0.4" />
-                <ellipse cx="197" cy="180" rx="8" ry="4.5" opacity="0.2" />
-                <ellipse cx="158" cy="223" rx="8" ry="3" opacity="0.35" />
-                <path d="M101 124 C98.5 144 100 168 108 188" fill="none" stroke="#ffffff" strokeWidth="3" opacity="0.55" />
+                {/* Faint lit planes — kept low so the skin stays matte */}
+                <g stroke="none" fill="#ffffff">
+                  <ellipse cx="150" cy="122" rx="14" ry="5" opacity="0.18" />
+                  <ellipse cx="158.5" cy="172" rx="1.8" ry="9" opacity="0.2" />
+                  <ellipse cx="158" cy="229" rx="6" ry="2" opacity="0.15" />
+                </g>
               </g>
             </g>
 
-            {/* Cheek blush */}
-            <ellipse className="rama-blush" cx="119" cy="186" rx="17" ry="10" fill="url(#ramaBlush)" />
-            <ellipse className="rama-blush" cx="201" cy="186" rx="17" ry="10" fill="url(#ramaBlush)" />
+            {/* ── Hair, swept back from a masculine hairline ── */}
+            <path
+              d="M106 150 C102 112 120 70 160 70 C200 70 218 112 214 150 C211 136 207 126 202 120
+                 C196 112 190 108 184 106 C176 103 168 104.5 160 104 C152 104.5 144 103 136 106
+                 C130 108 124 112 118 120 C113 126 109 136 106 150 Z"
+              fill="url(#ramaHair)"
+            />
+            <path
+              className="rama-hair-strands"
+              d="M130 108 C136 92 146 80 156 74 M146 105 C150 90 154 80 158 72 M117 124 C121 100 134 84 150 75 M110 140 C110 112 124 90 144 78"
+            />
+            <path
+              className="rama-hair-strands"
+              transform={MIRROR}
+              d="M130 108 C136 92 146 80 156 74 M146 105 C150 90 154 80 158 72 M117 124 C121 100 134 84 150 75 M110 140 C110 112 124 90 144 78"
+            />
 
-            {/* ── Front hair, parted in the centre ── */}
-            <FrontLock />
-            <FrontLock mirrored />
-
-            {/* ── Top-knot with jasmine and a red band ── */}
+            {/* ── Top-knot with a gold band ── */}
             <g className="rama-bun">
-              <circle cx="160" cy="54" r="30" fill="url(#ramaHair)" />
-              <path className="rama-bun-swirl" d="M160 34 Q176 40 172 58 Q166 48 152 50" fill="#22223c" />
+              <circle cx="160" cy="48" r="28" fill="url(#ramaHair)" />
               <path
                 className="rama-hair-strands"
-                d="M137 58 Q138 34 162 30 M142 68 Q138 44 158 38 Q176 36 184 52 M150 76 Q176 74 186 54 M146 40 Q160 26 178 36"
+                d="M138 56 Q138 32 162 24 M143 66 Q139 42 158 34 Q176 32 183 48 M150 73 Q176 70 185 50 M147 34 Q160 22 178 32"
               />
-              <path className="rama-hair-shine" d="M142 42 Q160 34 178 44 Q160 40 146 50 Z" fill="url(#ramaHairShine)" />
-              {JASMINE.map((p, i) => (
-                <g key={i}>
-                  <circle cx={p.x.toFixed(2)} cy={p.y.toFixed(2)} r="3" fill="#fbfaf2" stroke="#cfcab8" strokeWidth="0.6" />
-                  <circle cx={p.x.toFixed(2)} cy={p.y.toFixed(2)} r="0.9" fill="#f2c94c" />
-                </g>
-              ))}
+              <path d="M136 69 Q160 81 184 69 L184 75 Q160 87 136 75 Z" fill="url(#ramaGold)" stroke="#7a5212" strokeWidth="0.8" />
+              <path d="M138 72 Q160 84 182 72" fill="none" stroke="#7a5212" strokeWidth="0.8" strokeDasharray="2 2.5" opacity="0.7" />
             </g>
-            <rect x="132" y="64" width="56" height="12" rx="5" fill="url(#ramaBand)" />
-            <rect x="133" y="65.2" width="54" height="1.6" rx="0.8" fill="url(#ramaGold)" />
-            <rect x="133" y="73.2" width="54" height="1.6" rx="0.8" fill="url(#ramaGold)" />
-            <circle cx="148" cy="70" r="1.7" fill="url(#ramaPearl)" />
-            <circle cx="172" cy="70" r="1.7" fill="url(#ramaPearl)" />
-            <circle cx="160" cy="70" r="6" fill="url(#ramaGold)" stroke="#8a5a0a" strokeWidth="1" />
-            <circle cx="160" cy="70" r="2.8" fill="url(#ramaRuby)" />
 
             {/* Tilak — Vaishnava urdhva pundra: a pale U with a red centre line */}
             <g className="rama-tilak">
-              <path d="M154 96 C154 108 154.5 116 157 121 Q160 125 163 121 C165.5 116 166 108 166 96" fill="none" stroke="#fff5d8" strokeWidth="2.6" strokeLinecap="round" />
-              <path d="M160 100 L160 117" stroke="#d9203a" strokeWidth="2.4" strokeLinecap="round" />
+              <path d="M155.5 118 C155.5 128 156 136 158 141 Q160 144 162 141 C164 136 164.5 128 164.5 118" fill="none" stroke="#f4ecd6" strokeWidth="1.8" strokeLinecap="round" />
+              <path d="M160 121 L160 138" stroke="#c42034" strokeWidth="1.8" strokeLinecap="round" />
             </g>
 
-            {/* Eyebrows — tapered, with a few hair strokes along the grain */}
+            {/* Eyebrows — straight and heavy, with hair strokes along the grain */}
             <g className="rama-brow">
-              <path
-                className="rama-brow-fill"
-                d="M102 125 C111 114 126 109.5 138 112 C143 113 146.5 115 147 118 C147.4 121 146 123 144 122
-                   C136 118 122 116.5 111 121 C107 123 104 125.5 102 125 Z"
-              />
-              <path className="rama-brow-hairs" d="M144 120 L139 115.5 M137 117.5 L131 114 M128 117 L121 114.5 M119 118.5 L112 117.5" />
+              <path className="rama-brow-fill" d={BROW_PATH} />
+              <path className="rama-brow-hairs" d="M149 146 L145 143 M143 144.6 L138.5 142 M136.5 144.6 L131.5 142.8 M129.5 145.5 L124.5 145" />
             </g>
             <g transform={MIRROR}>
               <g className="rama-brow">
-                <path
-                  className="rama-brow-fill"
-                  d="M102 125 C111 114 126 109.5 138 112 C143 113 146.5 115 147 118 C147.4 121 146 123 144 122
-                     C136 118 122 116.5 111 121 C107 123 104 125.5 102 125 Z"
-                />
-                <path className="rama-brow-hairs" d="M144 120 L139 115.5 M137 117.5 L131 114 M128 117 L121 114.5 M119 118.5 L112 117.5" />
+                <path className="rama-brow-fill" d={BROW_PATH} />
+                <path className="rama-brow-hairs" d="M149 146 L145 143 M143 144.6 L138.5 142 M136.5 144.6 L131.5 142.8 M129.5 145.5 L124.5 145" />
               </g>
             </g>
 
@@ -714,12 +605,13 @@ export default function Rama({ mood = 'idle' }: RamaProps) {
             <Eye irisRef={irisLeftRef} closed={blinking || winking} />
             <Eye irisRef={irisRightRef} closed={blinking} mirrored />
 
-            {/* ── Nose — alar wings, nostrils and underside; no hard outline ── */}
-            <path className="rama-nose-shadow" d="M152.5 176 C150 177.5 150 181.5 154 182.5 L166 182.5 C170 181.5 170 177.5 167.5 176 Z" />
-            <path className="rama-nose-under" d="M151.5 175.5 C148.5 177 148.5 181.5 153 182 M168.5 175.5 C171.5 177 171.5 181.5 167 182" />
-            <ellipse className="rama-nostril" cx="155.8" cy="181" rx="2.5" ry="1.3" />
-            <ellipse className="rama-nostril" cx="164.2" cy="181" rx="2.5" ry="1.3" />
-            <path className="rama-nose-under" d="M155 183.2 Q160 185.2 165 183.2" />
+            {/* ── Nose — long straight bridge, alar wings and nostrils ── */}
+            <path className="rama-nose-bridge" d="M163.5 161 C164.5 171 166 179 167.5 185" />
+            <path className="rama-nose-shadow" d="M153 187 C150.5 188.5 150.5 192 154 193 L166 193 C169.5 192 169.5 188.5 167 187 Z" />
+            <path className="rama-nose-under" d="M152.5 186 C149.5 188 150.5 192.5 154.5 192.5 M167.5 186 C170.5 188 169.5 192.5 165.5 192.5" />
+            <ellipse className="rama-nostril" cx="156.3" cy="191.6" rx="1.9" ry="0.95" />
+            <ellipse className="rama-nostril" cx="163.7" cy="191.6" rx="1.9" ry="0.95" />
+            <path className="rama-nose-under" d="M155.5 193.5 Q160 195.3 164.5 193.5" />
 
             {/* ── Mouth ── every [data-part] path is re-shaped per mood */}
             <g ref={mouthRef} className="rama-mouth-group">
@@ -728,12 +620,10 @@ export default function Rama({ mood = 'idle' }: RamaProps) {
               <path data-part="shape" className="rama-mouth" d={IDLE_MOUTH.shape} />
               <g ref={mouthInnerRef} clipPath="url(#ramaMouthClip)" opacity={MOUTH.idle.open ? 1 : 0}>
                 {/* Tongue first, then the upper teeth over it */}
-                <ellipse cx="160" cy="228" rx="18" ry="12" fill="#d9607a" />
-                <ellipse cx="160" cy="225" rx="11" ry="6" fill="#f08fa1" opacity="0.55" />
-                <path d="M160 218 L160 232" stroke="#b44a62" strokeWidth="1.2" opacity="0.5" />
-                <ellipse cx="160" cy="193" rx="27" ry="10" fill="url(#ramaTeeth)" />
-                <path d="M152 188 L152.5 202 M168 188 L167.5 202 M144 189 L145.5 200 M176 189 L174.5 200" stroke="#c9c0cf" strokeWidth="0.9" opacity="0.6" />
-                <rect x="126" y="182" width="68" height="8" fill="#2e0f16" opacity="0.3" filter="url(#ramaBlurSm)" />
+                <ellipse cx="160" cy="228" rx="12" ry="7" fill="#b85a6e" />
+                <ellipse cx="160" cy="208" rx="18" ry="5.5" fill="url(#ramaTeeth)" />
+                <path d="M154.5 204 L155 213 M165.5 204 L165 213" stroke="#b9b2bd" strokeWidth="0.6" opacity="0.6" />
+                <rect x="136" y="200" width="48" height="5" fill="#2a1119" opacity="0.3" filter="url(#ramaBlurSm)" />
               </g>
               <path data-part="upper" className="rama-lip-upper" d={IDLE_MOUTH.upper} />
               <path data-part="line" className="rama-mouth-line" d={IDLE_MOUTH.line} />
