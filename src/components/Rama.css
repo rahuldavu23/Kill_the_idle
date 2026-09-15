@@ -96,24 +96,40 @@
   transition: transform 0.06s ease-out;
 }
 
-/* Lash line — the heaviest ink on the face, as in cel animation */
+/* Lash line — the heaviest ink on the face */
 .rama-lash {
   fill: none;
   stroke: #17172b;
-  stroke-width: 5.5;
+  stroke-width: 4;
   stroke-linecap: round;
 }
 
-/* Overdrawn outer half, faking the taper of a brush stroke */
-.rama-lash--outer { stroke-width: 8.5; }
-.rama-lash--flick { stroke-width: 4.5; }
+/* Overdrawn outer third, faking the taper of a brush stroke */
+.rama-lash--outer { stroke-width: 6.5; }
+.rama-lash--single { stroke-width: 1.8; }
+
+.rama-crease {
+  fill: none;
+  stroke: #3f6b99;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  opacity: 0.4;
+}
 
 .rama-lid-lower {
   fill: none;
-  stroke: #6ea9d2;
-  stroke-width: 2.6;
+  stroke: #5f93c2;
+  stroke-width: 1.6;
   stroke-linecap: round;
-  opacity: 0.65;
+  opacity: 0.45;
+}
+
+.rama-iris-fibers {
+  fill: none;
+  stroke: #2a1608;
+  stroke-width: 0.7;
+  stroke-linecap: round;
+  opacity: 0.45;
 }
 
 /* The closed-eye arc cross-fades with the lid so a blink reads as a
@@ -135,72 +151,125 @@
 /* A closed eye is a single curve, not an outlined oval — so the open-eye
    line work steps out of the way for the blink frame. */
 .rama-eye--closed .rama-lash,
+.rama-eye--closed .rama-lash-lower,
 .rama-eye--closed .rama-lid-lower {
   opacity: 0;
 }
 
 .rama-brow {
-  fill: #141425;
   transform-box: fill-box;
   transform-origin: bottom center;
   transition: transform 0.25s ease;
 }
 
+.rama-brow-fill { fill: #16162a; }
+
+.rama-brow-hairs {
+  fill: none;
+  stroke: #3a3a60;
+  stroke-width: 0.9;
+  stroke-linecap: round;
+  opacity: 0.8;
+}
+
 /* Nose is built from shading, not an outline */
 .rama-nose-shadow {
-  fill: #4f8cba;
-  opacity: 0.38;
+  fill: #2d5b8a;
+  opacity: 0.22;
 }
 
 .rama-nose-under {
   fill: none;
-  stroke: #3f7ba9;
-  stroke-width: 2.6;
-  stroke-linecap: round;
-  opacity: 0.7;
-}
-
-.rama-nose-light {
-  fill: none;
-  stroke: #ffffff;
-  stroke-width: 2;
-  stroke-linecap: round;
-  opacity: 0.45;
-}
-
-.rama-mouth {
-  fill: url(#ramaMouthInner);
-  stroke: none;
-  transition: d 0.09s ease;
-}
-
-/* Upper lip, drawn heavier than the lower one so the mouth has a
-   definite top edge whatever shape it holds. */
-.rama-mouth-line {
-  fill: none;
-  stroke: #5a1f28;
-  stroke-width: 3;
-  stroke-linecap: round;
-  transition: d 0.09s ease;
-}
-
-.rama-lip-shadow {
-  fill: #4f8cba;
-  opacity: 0.32;
-}
-
-.rama-lip-lower {
-  fill: none;
-  stroke: #ffffff;
-  stroke-width: 2.4;
+  stroke: #36659a;
+  stroke-width: 1.6;
   stroke-linecap: round;
   opacity: 0.5;
 }
 
-.rama-hair-shine {
-  animation: bunSway 5s ease-in-out infinite;
-  transform-box: fill-box;
-  transform-origin: bottom center;
+.rama-nostril {
+  fill: #1f3f66;
+  opacity: 0.5;
+}
+
+.rama-neck-line {
+  fill: none;
+  stroke: #2d5b8a;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  opacity: 0.22;
+}
+
+/* Every mouth layer tweens between mood shapes */
+.rama-mouth-group path {
+  transition: d 0.09s ease;
+}
+
+.rama-mouth { fill: url(#ramaMouthInner); }
+
+.rama-lip-upper { fill: url(#ramaLipUpper); }
+.rama-lip-lower { fill: url(#ramaLipLower); }
+
+/* The parting line, drawn heaviest so the mouth has a definite edge
+   whatever shape it holds. */
+.rama-mouth-line {
+  fill: none;
+  stroke: #3e1424;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+
+.rama-mouth-corner {
+  fill: none;
+  stroke: #3e1424;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+  opacity: 0.45;
+}
+
+.rama-lip-shadow {
+  fill: none;
+  stroke: #2d5b8a;
+  stroke-width: 4;
+  stroke-linecap: round;
+  opacity: 0.4;
+}
+
+.rama-lip-light {
+  fill: none;
+  stroke: #ffffff;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  opacity: 0.45;
+}
+
+.rama-lip-light--upper {
+  stroke-width: 1.1;
+  opacity: 0.35;
+}
+
+/* Hair: fine strands along the flow plus a soft sheen */
+.rama-hair-strands {
+  fill: none;
+  stroke: #3a3a64;
+  stroke-width: 1;
+  stroke-linecap: round;
+  opacity: 0.55;
+}
+
+.rama-hair-sheen {
+  fill: none;
+  stroke: #8a8ac4;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  opacity: 0.35;
+}
+
+.rama-ear-fold {
+  fill: none;
+  stroke: #36659a;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  opacity: 0.55;
 }
 
 /* Both brows are drawn from the same path, the right one mirrored, so
@@ -208,11 +277,22 @@
 .rama-frame:hover .rama-brow { transform: translateY(-3.5px) rotate(-2deg); }
 
 /* Gentle bun/hair sway so the character never feels frozen */
-.rama-bun,
-.rama-bun-swirl {
+.rama-bun {
   transform-box: fill-box;
   transform-origin: bottom center;
   animation: bunSway 5s ease-in-out infinite;
+}
+
+/* Earrings swing from the stud */
+.rama-earring {
+  transform-box: fill-box;
+  transform-origin: top center;
+  animation: earringSway 3.2s ease-in-out infinite;
+}
+
+@keyframes earringSway {
+  0%, 100% { transform: rotate(-4deg); }
+  50% { transform: rotate(4deg); }
 }
 
 @keyframes bunSway {
