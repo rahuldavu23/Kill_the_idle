@@ -158,11 +158,11 @@
   transition: transform 0.25s ease;
 }
 
-.rama-brow-fill { fill: #221a14; }
+.rama-brow-fill { fill: #15151b; }
 
 .rama-brow-hairs {
   fill: none;
-  stroke: #45372b;
+  stroke: #3a3a48;
   stroke-width: 0.7;
   stroke-linecap: round;
   opacity: 0.8;
@@ -211,12 +211,17 @@
   opacity: 0.5;
 }
 
-/* Every mouth layer tweens between mood shapes */
-.rama-mouth-group path {
-  transition: d 0.09s ease;
-}
-
+/* Mouth layers are re-shaped every frame from JS — no CSS transitions */
 .rama-mouth { fill: url(#ramaMouthInner); }
+
+/* A shared hairline outline ties both lips into one form */
+.rama-lip-upper,
+.rama-lip-lower {
+  stroke: #4a3a5e;
+  stroke-width: 0.6;
+  stroke-opacity: 0.35;
+  stroke-linejoin: round;
+}
 
 .rama-lip-upper { fill: url(#ramaLipUpper); }
 .rama-lip-lower { fill: url(#ramaLipLower); }
@@ -231,9 +236,9 @@
 .rama-mouth-corner {
   fill: none;
   stroke: #2e1a2a;
-  stroke-width: 0.9;
+  stroke-width: 0.8;
   stroke-linecap: round;
-  opacity: 0.4;
+  opacity: 0.28;
 }
 
 .rama-lip-shadow {
@@ -253,15 +258,21 @@
   opacity: 0.15;
 }
 
-.rama-lip-light--upper { opacity: 0.12; }
-
-/* Hair: fine strands along the flow */
+/* Hair: wavy strands along the flow, plus a faint sheen on each crest */
 .rama-hair-strands {
   fill: none;
-  stroke: #4d3d30;
+  stroke: #3c3c4c;
   stroke-width: 0.9;
   stroke-linecap: round;
-  opacity: 0.55;
+  opacity: 0.7;
+}
+
+.rama-hair-crest {
+  fill: none;
+  stroke: #5c5c72;
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  opacity: 0.4;
 }
 
 /* Both brows are drawn from the same path, the right one mirrored, so

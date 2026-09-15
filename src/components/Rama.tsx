@@ -23,9 +23,10 @@ interface RamaProps {
 // ── Mouth ─────────────────────────────────────────────────────
 // Each mouth is described by its two corners and the control points of
 // the upper line (`top`) and the bottom of the opening (`bottom`). Every
-// lip layer is derived from those numbers, so all layers keep the same
-// path structure between moods and CSS can tween `d` between them.
-// `open` says whether the mouth parts far enough for teeth and tongue.
+// lip layer is derived from those same numbers on every frame, so the
+// lips can never drift apart. Moods are just target values: the rig
+// eases the current numbers towards them in JS, which is smooth in every
+// browser (CSS `d` transitions are Chromium-only).
 type MouthShape = {
   x1: number
   y1: number
@@ -33,60 +34,93 @@ type MouthShape = {
   y2: number
   top: number
   bottom: number
-  cx?: number
-  open: boolean
+  cx: number
 }
 
-const MOUTH: Record<string, MouthShape> = {
-  idle: { x1: 143, y1: 208, x2: 177, y2: 208, top: 211, bottom: 216, open: false },
-  happy: { x1: 139, y1: 205, x2: 181, y2: 205, top: 211, bottom: 232, open: true },
-  thinking: { x1: 148, y1: 210, x2: 172, y2: 208, top: 207, bottom: 214, cx: 158, open: false },
-  amused: { x1: 138, y1: 204, x2: 182, y2: 204, top: 212, bottom: 232, open: true },
-  talkOpen: { x1: 145, y1: 206, x2: 175, y2: 206, top: 210, bottom: 228, open: true },
-  talkMid: { x1: 146, y1: 207, x2: 174, y2: 207, top: 211, bottom: 219, open: true },
-  talkClosed: { x1: 144, y1: 208, x2: 176, y2: 208, top: 211, bottom: 214, open: false },
+const MOUTH_KEYS = ['x1', 'y1', 'x2', 'y2', 'top', 'bottom', 'cx'] as const
+
+// Idle is a closed, warm smile: corners lifted ~3.5 units above the
+// centre of the lip line — clearly pleasant, nowhere near a grin.
+const MOUTH: Record<'idle' | 'happy' | 'thinking' | 'amused' | 'talkClosed' | 'talkOpen', MouthShape> = {
+  idle: { x1: 141, y1: 206, x2: 179, y2: 206, top: 213, bottom: 217, cx: 160 },
+  happy: { x1: 138, y1: 203.5, x2: 182, y2: 203.5, top: 212, bottom: 226, cx: 160 },
+  thinking: { x1: 148, y1: 209, x2: 172, y2: 207.5, top: 208, bottom: 213, cx: 158 },
+  amused: { x1: 137, y1: 202.5, x2: 183, y2: 202.5, top: 213, bottom: 229, cx: 160 },
+  talkClosed: { x1: 143, y1: 207, x2: 177, y2: 207, top: 211.5, bottom: 214.5, cx: 160 },
+  talkOpen: { x1: 145.5, y1: 206.5, x2: 174.5, y2: 206.5, top: 210.5, bottom: 226, cx: 160 },
 }
 
-const TALK_CYCLE = ['talkOpen', 'talkMid', 'talkClosed', 'talkMid'] as const
+const clamp01 = (n: number) => Math.min(1, Math.max(0, n))
+const f = (n: number) => n.toFixed(2)
 
-function mouthPaths({ x1, y1, x2, y2, top, bottom, cx = 160, open }: MouthShape) {
-  const upperThick = open ? 2.8 : 3.2
-  const lowerThick = open ? 3.5 : 4
+function mouthPaths({ x1, y1, x2, y2, top, bottom, cx }: MouthShape) {
   // A quadratic's midpoint sits at ¼·start + ½·control + ¼·end.
   const lineMid = (y1 + y2) / 4 + top / 2
   const openMid = (y1 + y2) / 4 + bottom / 2
+  // How far the lips are parted drives teeth visibility and lip thinning
+  // continuously, so opening and closing never pops.
+  const parted = clamp01((openMid - lineMid - 2.5) / 3.5)
+  const upperThick = 3.3 - 0.5 * parted
+  const lowerThick = 4.2 - 0.6 * parted
   const bow = lineMid - upperThick
-  const hl = openMid + lowerThick * 0.45
+  // On-curve centre of the lower lip's outer edge (not a control point).
+  const lowerOuter = openMid + lowerThick + 0.5
+  const hl = openMid + lowerThick * 0.5
   const sh = openMid + lowerThick + 3
 
   return {
-    shape: `M${x1} ${y1} Q${cx} ${bottom} ${x2} ${y2} Q${cx} ${top} ${x1} ${y1} Z`,
-    line: `M${x1} ${y1} Q${cx} ${top} ${x2} ${y2}`,
-    upper:
-      `M${x1} ${y1} Q${cx} ${top} ${x2} ${y2} ` +
-      `C${x2 - 4} ${y2 - 2} ${cx + 8} ${bow} ${cx + 3.5} ${bow} ` +
-      `Q${cx} ${bow + 1.4} ${cx - 3.5} ${bow} ` +
-      `C${cx - 8} ${bow} ${x1 + 4} ${y1 - 2} ${x1} ${y1} Z`,
-    upperLight:
-      `M${cx - 7} ${bow - 1} Q${cx - 3.5} ${bow - 1.8} ${cx} ${bow + 0.4} ` +
-      `Q${cx + 3.5} ${bow - 1.8} ${cx + 7} ${bow - 1}`,
-    lower: `M${x1} ${y1} Q${cx} ${bottom} ${x2} ${y2} Q${cx} ${bottom + lowerThick * 2} ${x1} ${y1} Z`,
-    lowerLight: `M${cx - 5} ${hl} Q${cx} ${hl + 1.2} ${cx + 5} ${hl}`,
-    shadow: `M${cx - 8} ${sh} Q${cx} ${sh + 3} ${cx + 8} ${sh}`,
-    corners:
-      `M${x1 + 1} ${y1 - 2} Q${x1 - 1.8} ${y1} ${x1 + 1} ${y1 + 2} ` +
-      `M${x2 - 1} ${y2 - 2} Q${x2 + 1.8} ${y2} ${x2 - 1} ${y2 + 2}`,
+    parted,
+    paths: {
+      shape: `M${f(x1)} ${f(y1)} Q${f(cx)} ${f(bottom)} ${f(x2)} ${f(y2)} Q${f(cx)} ${f(top)} ${f(x1)} ${f(y1)} Z`,
+      line: `M${f(x1)} ${f(y1)} Q${f(cx)} ${f(top)} ${f(x2)} ${f(y2)}`,
+      upper:
+        `M${f(x1)} ${f(y1)} Q${f(cx)} ${f(top)} ${f(x2)} ${f(y2)} ` +
+        `C${f(x2 - 5)} ${f(y2 - 1.2)} ${f(cx + 9)} ${f(bow)} ${f(cx + 3.6)} ${f(bow)} ` +
+        `Q${f(cx)} ${f(bow + 1.3)} ${f(cx - 3.6)} ${f(bow)} ` +
+        `C${f(cx - 9)} ${f(bow)} ${f(x1 + 5)} ${f(y1 - 1.2)} ${f(x1)} ${f(y1)} Z`,
+      // The lower lip's outer edge is a cubic pulled in from the corners,
+      // so it tapers into them instead of ending in a blunt crescent.
+      lower:
+        `M${f(x1)} ${f(y1)} Q${f(cx)} ${f(bottom)} ${f(x2)} ${f(y2)} ` +
+        `C${f(x2 - 4)} ${f(y2 + 2)} ${f(cx + 9)} ${f(lowerOuter - 0.5)} ${f(cx)} ${f(lowerOuter - 0.5)} ` +
+        `C${f(cx - 9)} ${f(lowerOuter - 0.5)} ${f(x1 + 4)} ${f(y1 + 2)} ${f(x1)} ${f(y1)} Z`,
+      lowerLight: `M${f(cx - 5)} ${f(hl)} Q${f(cx)} ${f(hl + 1.2)} ${f(cx + 5)} ${f(hl)}`,
+      shadow: `M${f(cx - 8)} ${f(sh)} Q${f(cx)} ${f(sh + 3)} ${f(cx + 8)} ${f(sh)}`,
+      // Small upturned creases at the corners carry the smile.
+      corners:
+        `M${f(x1 + 1.4)} ${f(y1 - 1.8)} Q${f(x1 - 1.6)} ${f(y1 - 0.4)} ${f(x1 + 0.2)} ${f(y1 + 2.2)} ` +
+        `M${f(x2 - 1.4)} ${f(y2 - 1.8)} Q${f(x2 + 1.6)} ${f(y2 - 0.4)} ${f(x2 - 0.2)} ${f(y2 + 2.2)}`,
+    },
   }
 }
 
-type MouthPart = keyof ReturnType<typeof mouthPaths>
+type MouthPart = keyof ReturnType<typeof mouthPaths>['paths']
 const IDLE_MOUTH = mouthPaths(MOUTH.idle)
 
 // ── Static geometry ───────────────────────────────────────────
-// Long oval with a defined jaw angle and a broad chin.
+// Cheekbones at the widest point, then near-straight planes down to a
+// sharp jaw angle and a squared chin.
 const FACE_PATH =
-  'M160 84 C200 84 215 112 215 150 C215 180 212 196 204 209 C194 225 178 237 160 237 ' +
-  'C142 237 126 225 116 209 C108 196 105 180 105 150 C105 112 120 84 160 84 Z'
+  'M160 84 C200 84 215 112 215 150 C215 172 213 188 209 199 C207.5 204 205 208 200 212.5 ' +
+  'L179 231 C173 236 167 238 160 238 C153 238 147 236 141 231 L120 212.5 ' +
+  'C115 208 112.5 204 111 199 C107 188 105 172 105 150 C105 112 120 84 160 84 Z'
+
+// Top-knot with a scalloped, wavy silhouette.
+const BUN_PATH = (() => {
+  const lobes = 10
+  const cx = 160
+  const cy = 48
+  const r = 26.5
+  const pt = (a: number, rad: number) => `${f(cx + Math.cos(a) * rad)} ${f(cy + Math.sin(a) * rad)}`
+  let d = ''
+  for (let i = 0; i < lobes; i++) {
+    const a0 = (i / lobes) * Math.PI * 2 - Math.PI / 2
+    const a1 = ((i + 1) / lobes) * Math.PI * 2 - Math.PI / 2
+    if (i === 0) d += `M${pt(a0, r)} `
+    d += `Q${pt((a0 + a1) / 2, r + 6)} ${pt(a1, r)} `
+  }
+  return d + 'Z'
+})()
 
 const NECK_PATH =
   'M137 205 L137 238 C136 252 126 262 104 270 L104 292 L216 292 L216 270 ' +
@@ -226,6 +260,7 @@ export default function Rama({ mood = 'idle' }: RamaProps) {
   const mouthRef = useRef<SVGGElement>(null)
   const mouthClipRef = useRef<SVGPathElement>(null)
   const mouthInnerRef = useRef<SVGGElement>(null)
+  const mouthShapeRef = useRef<MouthShape>({ ...MOUTH.idle })
 
   const [blinking, setBlinking] = useState(false)
   const [winking, setWinking] = useState(false)
@@ -286,31 +321,59 @@ export default function Rama({ mood = 'idle' }: RamaProps) {
     return () => clearTimeout(timeout)
   }, [])
 
-  // ── Mouth: mood shape, or talk-cycle while speaking ─────────
+  // ── Mouth: ease towards the mood's shape, or lip-sync while speaking ──
+  // The current shape lives in a ref so a mood change picks up from
+  // wherever the lips are mid-motion instead of jumping.
   useEffect(() => {
-    const applyShape = (key: string) => {
-      const next = MOUTH[key]
-      const paths = mouthPaths(next)
+    const group = mouthRef.current
+    if (!group) return
+    const parts = Array.from(group.querySelectorAll<SVGPathElement>('[data-part]'))
+    const cur = mouthShapeRef.current
+    const speaking = mood === 'speaking'
+    const rest = speaking ? MOUTH.talkClosed : MOUTH[mood]
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+
+    const apply = () => {
+      const { paths, parted } = mouthPaths(cur)
       mouthClipRef.current?.setAttribute('d', paths.shape)
-      mouthRef.current
-        ?.querySelectorAll<SVGPathElement>('[data-part]')
-        .forEach((el) => el.setAttribute('d', paths[el.dataset.part as MouthPart]))
-      mouthInnerRef.current?.setAttribute('opacity', next.open ? '1' : '0')
+      for (const el of parts) el.setAttribute('d', paths[el.dataset.part as MouthPart])
+      mouthInnerRef.current?.setAttribute('opacity', f(parted))
     }
 
-    if (mood !== 'speaking') {
-      applyShape(mood)
-      return
+    let raf = 0
+    let last = performance.now()
+    const target = { ...rest }
+
+    const tick = (now: number) => {
+      const dt = Math.min(0.05, (now - last) / 1000)
+      last = now
+
+      // Lip-sync is small and meaningful, so it runs even with reduced
+      // motion; only the easing between moods is dropped.
+      if (speaking) {
+        // Syllable-rate opening (~3 Hz) with a slower swell, so the
+        // rhythm feels like speech rather than a metronome.
+        const t = now / 1000
+        const open = clamp01(0.5 + 0.5 * Math.sin(t * 19) * (0.65 + 0.35 * Math.sin(t * 4.7 + 1.3)))
+        for (const k of MOUTH_KEYS) {
+          target[k] = MOUTH.talkClosed[k] + (MOUTH.talkOpen[k] - MOUTH.talkClosed[k]) * open
+        }
+      }
+
+      // Frame-rate independent exponential ease.
+      const ease = reduceMotion ? 1 : 1 - Math.exp(-dt * (speaking ? 20 : 9))
+      let remaining = 0
+      for (const k of MOUTH_KEYS) {
+        cur[k] += (target[k] - cur[k]) * ease
+        remaining = Math.max(remaining, Math.abs(target[k] - cur[k]))
+      }
+      apply()
+
+      if (speaking || remaining > 0.01) raf = requestAnimationFrame(tick)
     }
 
-    let frame = 0
-    applyShape(TALK_CYCLE[0])
-    const interval = setInterval(() => {
-      frame = (frame + 1) % TALK_CYCLE.length
-      applyShape(TALK_CYCLE[frame])
-    }, 120)
-
-    return () => clearInterval(interval)
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
   }, [mood])
 
   // ── Click: a quick wink, in addition to whatever the parent does ──
@@ -403,9 +466,9 @@ export default function Rama({ mood = 'idle' }: RamaProps) {
             </linearGradient>
 
             <linearGradient id="ramaHair" gradientUnits="userSpaceOnUse" x1="0" y1="20" x2="0" y2="170">
-              <stop offset="0%" stopColor="#3a2d22" />
-              <stop offset="50%" stopColor="#2a2018" />
-              <stop offset="100%" stopColor="#1a130e" />
+              <stop offset="0%" stopColor="#24242c" />
+              <stop offset="50%" stopColor="#131318" />
+              <stop offset="100%" stopColor="#09090c" />
             </linearGradient>
 
             <linearGradient id="ramaGold" x1="0" y1="0" x2="0" y2="1">
@@ -451,7 +514,7 @@ export default function Rama({ mood = 'idle' }: RamaProps) {
             </clipPath>
 
             <clipPath id="ramaMouthClip">
-              <path ref={mouthClipRef} d={IDLE_MOUTH.shape} />
+              <path ref={mouthClipRef} d={IDLE_MOUTH.paths.shape} />
             </clipPath>
           </defs>
 
@@ -468,7 +531,7 @@ export default function Rama({ mood = 'idle' }: RamaProps) {
             <g clipPath="url(#ramaNeckClip)">
               <g filter="url(#ramaBlur)" fill={SHADOW}>
                 {/* Jaw's cast shadow, and the side turned from the light */}
-                <path d="M128 205 Q160 250 192 205 L192 222 Q160 262 128 222 Z" opacity="0.5" />
+                <path d="M120 212 L141 232 Q160 246 179 232 L200 212 L200 232 L179 252 Q160 264 141 252 L120 232 Z" opacity="0.55" />
                 <rect x="172" y="205" width="12" height="70" opacity="0.28" />
                 <ellipse cx="160" cy="274" rx="5" ry="3.5" opacity="0.35" />
               </g>
@@ -520,7 +583,8 @@ export default function Rama({ mood = 'idle' }: RamaProps) {
 
             {/* ── Back of the head: hair seen behind the ears ── */}
             <path
-              d="M104 168 C94 116 114 62 160 62 C206 62 226 116 216 168 C212 176 206 176 204 168 L116 168 C114 176 108 176 104 168 Z"
+              d="M104 170 Q97 160 101 150 Q95 138 100 126 Q96 110 106 98 Q108 80 124 72 Q138 60 160 62
+                 Q182 60 196 72 Q212 80 214 98 Q224 110 220 126 Q225 138 219 150 Q223 160 216 170 Z"
               fill="url(#ramaHair)"
             />
 
@@ -536,8 +600,14 @@ export default function Rama({ mood = 'idle' }: RamaProps) {
                   sockets, the shaded side of the nose and its cast shadow. */}
               <g filter="url(#ramaBlur)" fill="none" stroke={SHADOW}>
                 <path d="M108 150 C112 128 124 110 140 106 C150 104 170 104 180 106 C196 110 208 128 212 150" strokeWidth="8" opacity="0.3" />
-                <path d="M114 186 C122 202 134 210 146 214 M206 186 C198 202 186 210 174 214" strokeWidth="6" opacity="0.2" />
-                <path d="M108 180 C114 208 138 232 160 234 C182 232 206 208 212 180" strokeWidth="10" opacity="0.3" />
+                {/* Hollow under each cheekbone, running down to the jaw angle */}
+                <path d="M112 178 C117 192 124 202 132 208 M208 178 C203 192 196 202 188 208" strokeWidth="6" opacity="0.26" />
+                {/* Jawline: shadow tucked inside the angle and along the chin */}
+                <path d="M109 182 C110 194 113 204 120 211 L141 229.5 C150 235.5 170 235.5 179 229.5 L200 211 C207 204 210 194 211 182" strokeWidth="9" opacity="0.36" />
+                <ellipse cx="117" cy="203" rx="5" ry="9" stroke="none" fill={SHADOW} opacity="0.25" />
+                <ellipse cx="203" cy="203" rx="5" ry="9" stroke="none" fill={SHADOW} opacity="0.32" />
+                {/* Crease between lower lip and chin */}
+                <path d="M152 224 Q160 221.5 168 224" strokeWidth="2.5" opacity="0.3" />
                 <path d="M164 160 C166 170 167.5 178 168 186" strokeWidth="3.5" opacity="0.3" />
                 <g stroke="none" fill={SHADOW}>
                   <ellipse cx="109" cy="160" rx="7" ry="26" opacity="0.22" />
@@ -556,29 +626,39 @@ export default function Rama({ mood = 'idle' }: RamaProps) {
             </g>
 
             {/* ── Hair, swept back from a masculine hairline ── */}
+            {/* The hairline is scalloped so the waves read at the edge too */}
             <path
-              d="M106 150 C102 112 120 70 160 70 C200 70 218 112 214 150 C211 136 207 126 202 120
-                 C196 112 190 108 184 106 C176 103 168 104.5 160 104 C152 104.5 144 103 136 106
-                 C130 108 124 112 118 120 C113 126 109 136 106 150 Z"
+              d="M106 150 C102 112 120 70 160 70 C200 70 218 112 214 150 Q213 141 209 136 Q211 128 204 122
+                 Q202 113 194 110 Q188 104 180 106 Q172 101 164 105 Q160 102 156 105 Q148 101 140 106
+                 Q132 104 126 110 Q118 113 116 122 Q109 128 111 136 Q107 141 106 150 Z"
               fill="url(#ramaHair)"
             />
-            <path
-              className="rama-hair-strands"
-              d="M130 108 C136 92 146 80 156 74 M146 105 C150 90 154 80 158 72 M117 124 C121 100 134 84 150 75 M110 140 C110 112 124 90 144 78"
-            />
-            <path
-              className="rama-hair-strands"
-              transform={MIRROR}
-              d="M130 108 C136 92 146 80 156 74 M146 105 C150 90 154 80 158 72 M117 124 C121 100 134 84 150 75 M110 140 C110 112 124 90 144 78"
-            />
-
-            {/* ── Top-knot with a gold band ── */}
-            <g className="rama-bun">
-              <circle cx="160" cy="48" r="28" fill="url(#ramaHair)" />
+            <g className="rama-hair-waves">
               <path
                 className="rama-hair-strands"
-                d="M138 56 Q138 32 162 24 M143 66 Q139 42 158 34 Q176 32 183 48 M150 73 Q176 70 185 50 M147 34 Q160 22 178 32"
+                d="M122 116 C116 104 128 96 124 86 C122 80 130 74 140 72 M136 107 C130 96 142 88 138 80 C136 75 144 71 152 70
+                   M150 104 C146 94 156 88 152 80 C150 75 156 71 160 70 M112 134 C104 120 118 110 112 98 C110 90 118 80 128 76"
               />
+              <path className="rama-hair-crest" d="M117 104 Q123 97 129 99 M131 90 Q137 83 143 85 M145 94 Q150 88 155 90" />
+            </g>
+            <g className="rama-hair-waves" transform={MIRROR}>
+              <path
+                className="rama-hair-strands"
+                d="M122 116 C116 104 128 96 124 86 C122 80 130 74 140 72 M136 107 C130 96 142 88 138 80 C136 75 144 71 152 70
+                   M150 104 C146 94 156 88 152 80 C150 75 156 71 160 70 M112 134 C104 120 118 110 112 98 C110 90 118 80 128 76"
+              />
+              <path className="rama-hair-crest" d="M117 104 Q123 97 129 99 M131 90 Q137 83 143 85 M145 94 Q150 88 155 90" />
+            </g>
+
+            {/* ── Wavy top-knot with a gold band ── */}
+            <g className="rama-bun">
+              <path d={BUN_PATH} fill="url(#ramaHair)" />
+              <path
+                className="rama-hair-strands"
+                d="M146 36 C154 27 170 29 174 39 C178 49 168 57 160 53 C152 49 156 41 164 43
+                   M136 54 C136 64 146 72 156 72 M184 46 C186 60 178 70 166 74 M140 36 C146 28 150 30 156 24"
+              />
+              <path className="rama-hair-crest" d="M150 31 Q160 25 170 31 M141 58 Q145 66 151 68" />
               <path d="M136 69 Q160 81 184 69 L184 75 Q160 87 136 75 Z" fill="url(#ramaGold)" stroke="#7a5212" strokeWidth="0.8" />
               <path d="M138 72 Q160 84 182 72" fill="none" stroke="#7a5212" strokeWidth="0.8" strokeDasharray="2 2.5" opacity="0.7" />
             </g>
@@ -615,21 +695,20 @@ export default function Rama({ mood = 'idle' }: RamaProps) {
 
             {/* ── Mouth ── every [data-part] path is re-shaped per mood */}
             <g ref={mouthRef} className="rama-mouth-group">
-              <path data-part="shadow" className="rama-lip-shadow" d={IDLE_MOUTH.shadow} filter="url(#ramaBlurSm)" />
-              <path data-part="lower" className="rama-lip-lower" d={IDLE_MOUTH.lower} />
-              <path data-part="shape" className="rama-mouth" d={IDLE_MOUTH.shape} />
-              <g ref={mouthInnerRef} clipPath="url(#ramaMouthClip)" opacity={MOUTH.idle.open ? 1 : 0}>
+              <path data-part="shadow" className="rama-lip-shadow" d={IDLE_MOUTH.paths.shadow} filter="url(#ramaBlurSm)" />
+              <path data-part="lower" className="rama-lip-lower" d={IDLE_MOUTH.paths.lower} />
+              <path data-part="shape" className="rama-mouth" d={IDLE_MOUTH.paths.shape} />
+              <g ref={mouthInnerRef} clipPath="url(#ramaMouthClip)" opacity={f(IDLE_MOUTH.parted)}>
                 {/* Tongue first, then the upper teeth over it */}
                 <ellipse cx="160" cy="228" rx="12" ry="7" fill="#b85a6e" />
                 <ellipse cx="160" cy="208" rx="18" ry="5.5" fill="url(#ramaTeeth)" />
                 <path d="M154.5 204 L155 213 M165.5 204 L165 213" stroke="#b9b2bd" strokeWidth="0.6" opacity="0.6" />
                 <rect x="136" y="200" width="48" height="5" fill="#2a1119" opacity="0.3" filter="url(#ramaBlurSm)" />
               </g>
-              <path data-part="upper" className="rama-lip-upper" d={IDLE_MOUTH.upper} />
-              <path data-part="line" className="rama-mouth-line" d={IDLE_MOUTH.line} />
-              <path data-part="corners" className="rama-mouth-corner" d={IDLE_MOUTH.corners} />
-              <path data-part="upperLight" className="rama-lip-light rama-lip-light--upper" d={IDLE_MOUTH.upperLight} />
-              <path data-part="lowerLight" className="rama-lip-light" d={IDLE_MOUTH.lowerLight} />
+              <path data-part="upper" className="rama-lip-upper" d={IDLE_MOUTH.paths.upper} />
+              <path data-part="line" className="rama-mouth-line" d={IDLE_MOUTH.paths.line} />
+              <path data-part="corners" className="rama-mouth-corner" d={IDLE_MOUTH.paths.corners} />
+              <path data-part="lowerLight" className="rama-lip-light" d={IDLE_MOUTH.paths.lowerLight} />
             </g>
           </g>
 
