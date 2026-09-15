@@ -1,10 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import './App.css'
 import Rama from './components/Rama'
 import SpeechBubble from './components/SpeechBubble'
-import { dialogue, randomFrom, getGreeting, matchKeyword } from './data/dialogue'
-
-type RamaMood = 'idle' | 'happy' | 'thinking' | 'amused' | 'speaking'
+import { dialogue, randomFrom, getGreeting, type RamaMood } from './data/dialogue'
+import { createRamaChat } from './data/chat'
 
 interface Task {
   id: number
@@ -30,15 +29,39 @@ export default function App() {
 
   const [userInput, setUserInput] = useState('')
 
+  // One chat engine for the session, so it remembers the last topic and
+  // which lines it has used recently.
+  const [chat] = useState(createRamaChat)
+
+  // Every pending bubble/mood timer lives here, so a new message cancels
+  // the old one's timers instead of being hidden early by them.
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([])
+  // True while Rama is "thinking" about a reply — idle chatter and clicks
+  // must not talk over it.
+  const busyRef = useRef(false)
+
+  const clearTimers = useCallback(() => {
+    timersRef.current.forEach(clearTimeout)
+    timersRef.current = []
+  }, [])
+
+  const later = useCallback((fn: () => void, ms: number) => {
+    timersRef.current.push(setTimeout(fn, ms))
+  }, [])
+
+  useEffect(() => clearTimers, [clearTimers])
+
   const showMessage = useCallback((text: string, ramaMood: RamaMood = 'speaking', duration = 5000) => {
+    clearTimers()
+    busyRef.current = false
     setMessage(text)
     setMood(ramaMood)
     setBubble(true)
-    setTimeout(() => {
+    later(() => {
       setBubble(false)
-      setTimeout(() => setMood('idle'), 400)
+      later(() => setMood('idle'), 400)
     }, duration)
-  }, [])
+  }, [clearTimers, later])
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -49,6 +72,7 @@ export default function App() {
 
   useEffect(() => {
     const idleTimer = setInterval(() => {
+      if (busyRef.current) return
       setBubble(current => {
         if (!current) showMessage(randomFrom(dialogue.idle), 'idle', 6000)
         return current
@@ -85,17 +109,27 @@ export default function App() {
 
   const removeEnjoy = (id: number) => setEnjoys(prev => prev.filter(e => e.id !== id))
 
-  // Talk to Rama
+  // Talk to Rama — a short thinking pause, then a reply to what was said
   const talkToRama = () => {
     const text = userInput.trim()
     if (!text) return
-    const response = matchKeyword(text) ?? randomFrom(dialogue.idle)
-    showMessage(response, 'speaking', 7000)
     setUserInput('')
+
+    const reply = chat.reply(text, {
+      pendingTasks: tasks.filter(t => !t.done).map(t => t.text),
+      doneTasks: tasks.filter(t => t.done).length,
+      enjoys: enjoys.map(e => e.text),
+    })
+
+    clearTimers()
+    busyRef.current = true
+    setBubble(false)
+    setMood('thinking')
+    later(() => showMessage(reply.text, 'speaking', reply.hold), 600 + Math.min(700, text.length * 8))
   }
 
   const handleRamaClick = () => {
-    if (!bubbleVisible) showMessage(randomFrom(dialogue.idle), 'thinking', 5000)
+    if (!bubbleVisible && !busyRef.current) showMessage(randomFrom(dialogue.idle), 'thinking', 5000)
   }
 
   return (
