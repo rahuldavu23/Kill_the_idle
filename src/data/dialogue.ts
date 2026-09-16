@@ -8,6 +8,8 @@ export interface ChatContext {
   pendingTasks: string[]
   doneTasks: number
   enjoys: string[]
+  // Whatever is still undone in today's plan, in the order it was arranged.
+  todayTasks: string[]
 }
 
 // A topic Rama can recognise in what the user types.
@@ -75,6 +77,15 @@ export const dialogue = {
     "Another stone laid on the path. I am proud of you.",
     "That which needed doing, has been done. Peace.",
     "Ha! Even the gods celebrate small victories. Well done.",
+  ],
+
+  // Fires when the last task in today's plan is checked off
+  dayComplete: [
+    "Every thing you set for today is done. Let the rest of the day be yours.",
+    "The plan is finished. Notice that you did it — then set it down.",
+    "You named the day's work and you completed it. That is a whole life in miniature.",
+    "Nothing left on today's list. Rest is not idleness when the work is done.",
+    "The day asked, and you answered in full. Well done, friend.",
   ],
 
   // Time-of-day greetings fired once on app load
@@ -419,14 +430,21 @@ export const intents: Intent[] = [
       ['what should i do', 3], ['what do i do', 3], ["what's next", 3], ['what next', 3], ['what now', 3],
       ['where do i start', 3], ['where should i start', 3], ['my tasks', 3], ['my list', 2.5], ['to do list', 3], ['todo', 2.5],
       ['what to do', 3], ['help me focus', 3],
+      ['what should i do today', 4], ['my day', 2.5], ['my plan', 2.5], ['plan for today', 3.5], ["today's plan", 3.5], ['first thing', 2.5],
     ],
     dynamic: (ctx) => {
+      // Today's plan is a sequence the user chose, so it answers first.
+      if (ctx.todayTasks.length > 0) {
+        const rest = ctx.todayTasks.length - 1
+        const extra = rest > 0 ? ` The remaining ${rest} will keep their place in line.` : ''
+        return `Today begins with "${ctx.todayTasks[0]}". Only that.${extra}`
+      }
       if (ctx.pendingTasks.length > 0) {
         const extra = ctx.pendingTasks.length > 1 ? ` The other ${ctx.pendingTasks.length - 1} can wait.` : ''
         return `Begin with "${ctx.pendingTasks[0]}". Only that.${extra}`
       }
-      if (ctx.doneTasks > 0) return "Your list is complete. Rest, or name the next worthy thing and add it."
-      return "Your list is empty. Name one thing worth doing and add it to your Focus list."
+      if (ctx.doneTasks > 0) return "Your lists are complete. Rest, or name the next worthy thing and add it."
+      return "Your lists are empty. Put one thing in today's plan — the first thing you mean to do."
     },
     responses: [],
   },

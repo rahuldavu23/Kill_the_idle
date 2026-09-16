@@ -4,6 +4,7 @@ import Rama from './components/Rama'
 import SpeechBubble from './components/SpeechBubble'
 import { dialogue, randomFrom, getGreeting, type RamaMood } from './data/dialogue'
 import { createRamaChat } from './data/chat'
+import { todayKey, formatDay, loadToday, saveToday, moveTask, type TodayTask } from './data/todayTasks'
 
 interface Task {
   id: number
@@ -26,6 +27,11 @@ export default function App() {
 
   const [enjoys, setEnjoys]         = useState<EnjoyItem[]>([])
   const [enjoyInput, setEnjoyInput] = useState('')
+
+  // Today's plan — an ordered list tied to the calendar day it was written on.
+  const [dayKey, setDayKey]       = useState(todayKey)
+  const [today, setToday]         = useState<TodayTask[]>(() => loadToday(todayKey()))
+  const [todayInput, setTodayInput] = useState('')
 
   const [userInput, setUserInput] = useState('')
 
@@ -109,6 +115,48 @@ export default function App() {
 
   const removeEnjoy = (id: number) => setEnjoys(prev => prev.filter(e => e.id !== id))
 
+  // Today's plan — persisted under the day it belongs to
+  useEffect(() => saveToday(dayKey, today), [dayKey, today])
+
+  // If the app is left open past midnight, the plan on screen stops being
+  // today's. Roll over to the new day and start it clean.
+  useEffect(() => {
+    const rollover = setInterval(() => {
+      const key = todayKey()
+      if (key === dayKey) return
+      setDayKey(key)
+      setToday(loadToday(key))
+    }, 30000)
+    return () => clearInterval(rollover)
+  }, [dayKey])
+
+  const addTodayTask = () => {
+    const text = todayInput.trim()
+    if (!text) return
+    setToday(prev => [...prev, { id: Date.now(), text, done: false }])
+    setTodayInput('')
+    showMessage(randomFrom(dialogue.taskAdded), 'happy', 5000)
+  }
+
+  const toggleTodayTask = (id: number) => {
+    const task = today.find(t => t.id === id)
+    if (!task) return
+    const next = today.map(t => t.id === id ? { ...t, done: !t.done } : t)
+    setToday(next)
+    if (task.done) return
+    // Finishing the last one is a bigger moment than finishing any other.
+    const finished = next.every(t => t.done)
+    showMessage(
+      randomFrom(finished ? dialogue.dayComplete : dialogue.taskCompleted),
+      finished ? 'happy' : 'amused',
+      finished ? 6500 : 5000,
+    )
+  }
+
+  const removeTodayTask = (id: number) => setToday(prev => prev.filter(t => t.id !== id))
+
+  const reorderTodayTask = (id: number, delta: -1 | 1) => setToday(prev => moveTask(prev, id, delta))
+
   // Talk to Rama — a short thinking pause, then a reply to what was said
   const talkToRama = () => {
     const text = userInput.trim()
@@ -119,6 +167,7 @@ export default function App() {
       pendingTasks: tasks.filter(t => !t.done).map(t => t.text),
       doneTasks: tasks.filter(t => t.done).length,
       enjoys: enjoys.map(e => e.text),
+      todayTasks: today.filter(t => !t.done).map(t => t.text),
     })
 
     clearTimers()
@@ -127,6 +176,10 @@ export default function App() {
     setMood('thinking')
     later(() => showMessage(reply.text, 'speaking', reply.hold), 600 + Math.min(700, text.length * 8))
   }
+
+  // The first unfinished step is the one the whole panel points at.
+  const nextStep = today.findIndex(t => !t.done)
+  const doneToday = today.filter(t => t.done).length
 
   const handleRamaClick = () => {
     if (!bubbleVisible && !busyRef.current) showMessage(randomFrom(dialogue.idle), 'thinking', 5000)
@@ -209,6 +262,64 @@ export default function App() {
             </li>
           ))}
         </ul>
+      </div>
+
+
+      {/* BOTTOM PANEL — today's plan, in the order it should be done */}
+      <div className="task-panel today">
+        <div className="today-head">
+          <h2 className="panel-title">Today · in order</h2>
+          <span className="today-date">{formatDay(dayKey)}</span>
+        </div>
+
+        <div className="panel-input-row">
+          <input
+            className="panel-input"
+            value={todayInput}
+            onChange={e => setTodayInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addTodayTask()}
+            placeholder="Next thing to do today..."
+          />
+          <button className="panel-add-btn" onClick={addTodayTask}>+</button>
+        </div>
+
+        {today.length === 0 ? (
+          <p className="today-empty">Nothing planned yet. Name the first thing you mean to do today.</p>
+        ) : (
+          <ol className="panel-list today-list">
+            {today.map((task, index) => (
+              <li
+                key={task.id}
+                className={`panel-item today-item${task.done ? ' panel-item--done' : ''}${index === nextStep ? ' today-item--next' : ''}`}
+              >
+                <span className="today-step">{index + 1}</span>
+                <button className="item-check" onClick={() => toggleTodayTask(task.id)} aria-label="Toggle task">
+                  {task.done ? '✓' : ''}
+                </button>
+                <span className="item-text">{task.text}</span>
+                <span className="today-move">
+                  <button
+                    className="today-move-btn"
+                    onClick={() => reorderTodayTask(task.id, -1)}
+                    disabled={index === 0}
+                    aria-label="Move earlier"
+                  >▲</button>
+                  <button
+                    className="today-move-btn"
+                    onClick={() => reorderTodayTask(task.id, 1)}
+                    disabled={index === today.length - 1}
+                    aria-label="Move later"
+                  >▼</button>
+                </span>
+                <button className="item-remove" onClick={() => removeTodayTask(task.id)} aria-label="Remove">×</button>
+              </li>
+            ))}
+          </ol>
+        )}
+
+        {today.length > 0 && (
+          <div className="today-progress">{doneToday} of {today.length} done</div>
+        )}
       </div>
 
     </div>
