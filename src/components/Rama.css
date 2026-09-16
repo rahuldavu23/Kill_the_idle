@@ -4,7 +4,9 @@
 
 .rama-root {
   position: relative;
-  width: clamp(220px, 20vw, 300px);
+  /* She is square, so her width spends vertical budget too — on a short
+     window the vh term keeps her from crowding out the bubble and the plan. */
+  width: clamp(140px, min(20vw, 22vh), 300px);
   aspect-ratio: 1 / 1;
 
   display: flex;

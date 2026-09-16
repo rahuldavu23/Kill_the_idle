@@ -1,3 +1,18 @@
+/* The stage divides the window vertically: a speech bubble above Rama and
+   today's plan below her. Both reserves live here so they cannot drift
+   apart from the elements that have to fit inside them. */
+:root {
+    /* The bubble's floor is absolute, not proportional: its height comes from
+       how long Rama's line is, not from the window, and the longest line in
+       the bank needs ~150px. A short window (a laptop once the browser's own
+       toolbar is subtracted) is exactly where a vh-only reserve fails. */
+    --bubble-reserve: clamp(160px, 20vh, 210px);
+    /* Capped by what is actually left once the bubble and Rama have taken
+       their share, so a short window shrinks the plan rather than letting the
+       two collide. The 240px is Rama plus her chat row plus the gaps. */
+    --today-reserve:  clamp(180px, min(38vh, 100vh - var(--bubble-reserve) - 240px), 380px);
+}
+
 .app-shell {
     width: 100vw;
     height: 100vh;
@@ -15,8 +30,10 @@
     justify-content: center;
     gap: 1.25rem;
     height: 100vh;
-    /* Room for today's plan, which sits at the foot of the stage. */
-    padding-bottom: clamp(200px, 33vh, 320px);
+    /* Headroom so a long line from Rama is never clipped by the top of the
+       window, and room at the foot for today's plan. */
+    padding-top: var(--bubble-reserve);
+    padding-bottom: calc(var(--today-reserve) + 1.25rem);
     box-sizing:border-box;
     z-index: 10;
 }
@@ -251,14 +268,14 @@
 
 .task-panel.today {
     top: auto;
-    bottom: 1.75rem;
+    bottom: 1.25rem;
     left: 50%;
     transform: translateX(-50%);
     width: min(540px, 40vw);
     min-width: 320px;
     height: auto;
-    max-height: 30vh;
-    padding: 1.1rem 1.25rem 0.9rem;
+    max-height: var(--today-reserve);
+    padding: 0.95rem 1.25rem 0.75rem;
     z-index: 15;
 }
 
@@ -282,7 +299,9 @@
 
 .today-item {
     gap: 0.55rem;
-    padding: 0.4rem 0.4rem;
+    /* Tight vertically: the stacked move buttons already set the row height,
+       so padding here only costs visible steps. */
+    padding: 0.15rem 0.4rem;
     border-radius: 8px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
@@ -314,7 +333,8 @@
     flex-direction: column;
     gap: 1px;
     flex-shrink: 0;
-    opacity: 0.35;
+    /* Visible without hover — a touch screen never gets the hover state. */
+    opacity: 0.55;
     transition: opacity 0.2s;
 }
 
@@ -322,19 +342,28 @@
     opacity: 1;
 }
 
+/* Two of these stack inside one row, so height is the tight dimension —
+   the width and the hover plate carry most of the hit area. */
 .today-move-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 15px;
     background: transparent;
     border: none;
+    border-radius: 4px;
     cursor: pointer;
-    color: rgba(255, 255, 255, 0.35);
-    font-size: 0.5rem;
+    color: rgba(255, 255, 255, 0.45);
+    font-size: 0.6rem;
     line-height: 1;
-    padding: 1px 2px;
-    transition: color 0.2s;
+    padding: 0;
+    transition: color 0.2s, background 0.2s;
 }
 
 .today-move-btn:hover:not(:disabled) {
-    color: rgba(255, 200, 100, 0.8);
+    color: rgba(255, 200, 100, 0.9);
+    background: rgba(255, 200, 100, 0.12);
 }
 
 .today-move-btn:disabled {
