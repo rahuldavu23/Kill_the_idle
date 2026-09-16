@@ -45,6 +45,9 @@ export default function App() {
   // True while Rama is "thinking" about a reply — idle chatter and clicks
   // must not talk over it.
   const busyRef = useRef(false)
+  // Counts exchanges, so a reply that arrives after the user has already
+  // said something else is discarded instead of overwriting the newer one.
+  const turnRef = useRef(0)
 
   const clearTimers = useCallback(() => {
     timersRef.current.forEach(clearTimeout)
@@ -157,24 +160,36 @@ export default function App() {
 
   const reorderTodayTask = (id: number, delta: -1 | 1) => setToday(prev => moveTask(prev, id, delta))
 
-  // Talk to Rama — a short thinking pause, then a reply to what was said
-  const talkToRama = () => {
+  // Talk to Rama — a short thinking pause, then a reply to what was said.
+  // The mind is async so a slower one can be swapped in; the pause is a
+  // floor, not a fixed wait, so a reply that takes longer simply lands when
+  // it is ready rather than being rushed on screen.
+  const talkToRama = async () => {
     const text = userInput.trim()
     if (!text) return
     setUserInput('')
-
-    const reply = chat.reply(text, {
-      pendingTasks: tasks.filter(t => !t.done).map(t => t.text),
-      doneTasks: tasks.filter(t => t.done).length,
-      enjoys: enjoys.map(e => e.text),
-      todayTasks: today.filter(t => !t.done).map(t => t.text),
-    })
 
     clearTimers()
     busyRef.current = true
     setBubble(false)
     setMood('thinking')
-    later(() => showMessage(reply.text, 'speaking', reply.hold), 600 + Math.min(700, text.length * 8))
+
+    // This exchange's token — a newer message makes an older reply stale.
+    const turn = ++turnRef.current
+    const pause = 600 + Math.min(700, text.length * 8)
+
+    const [reply] = await Promise.all([
+      chat.reply(text, {
+        pendingTasks: tasks.filter(t => !t.done).map(t => t.text),
+        doneTasks: tasks.filter(t => t.done).length,
+        enjoys: enjoys.map(e => e.text),
+        todayTasks: today.filter(t => !t.done).map(t => t.text),
+      }),
+      new Promise(resolve => setTimeout(resolve, pause)),
+    ])
+
+    if (turn !== turnRef.current) return
+    showMessage(reply.text, 'speaking', reply.hold)
   }
 
   // The first unfinished step is the one the whole panel points at.

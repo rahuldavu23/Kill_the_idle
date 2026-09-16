@@ -1,18 +1,14 @@
-// Rama's reply engine — understands a typed message well enough to pick a
-// fitting line from the dialogue bank. Runs fully offline.
+// Rama's local mind — understands a typed message well enough to answer the
+// situation, not merely the subject. Runs fully offline.
 //
 // Pipeline: normalise the text (case, contractions, slang) → match intent
-// patterns on whole words, longest phrases first → apply negation → pick
-// the winning intent, pairing a social opener with a weightier topic when
-// both appear → choose a line that hasn't been used recently.
+// patterns on whole words, longest phrases first → apply negation → pick the
+// winning intent → pick a *facet* inside it, so "my dad is in the hospital"
+// and "my dad and I argued" get different answers → name what the user
+// mentioned → choose a line that hasn't been used recently.
 
-import { dialogue, intents, type ChatContext, type Intent } from './dialogue'
-
-export interface ChatReply {
-  text: string
-  intent: string | null
-  hold: number
-}
+import { dialogue, intents, type ChatContext, type Facet, type Intent } from './dialogue'
+import type { ChatReply, RamaMind } from './mind'
 
 // ── Normalisation ───────────────────────────────────────────────
 const SLANG: Record<string, string> = {
@@ -67,22 +63,32 @@ interface CompiledPattern {
 
 const intentById = new Map(intents.map((i) => [i.id, i]))
 
+// A pattern is written naturally ("can't sleep", "procrastinat*") and is
+// normalised the same way the user's message is. A trailing * matches any
+// word with that stem; a pair carries an explicit weight.
+function compilePattern(p: string | [string, number]) {
+  const [raw, explicit] = typeof p === 'string' ? [p, undefined] : p
+  const star = raw.endsWith('*')
+  const words = tokenize(star ? raw.slice(0, -1) : raw)
+  if (star) words[words.length - 1] += '*'
+  return { words, weight: explicit ?? 1 + 0.5 * (words.length - 1) }
+}
+
 const compiled: CompiledPattern[] = intents
-  .flatMap((intent) =>
-    intent.patterns.map((p) => {
-      const [raw, explicit] = typeof p === 'string' ? [p, undefined] : p
-      // Keep a trailing * through tokenisation.
-      const star = raw.endsWith('*')
-      const words = tokenize(star ? raw.slice(0, -1) : raw)
-      if (star) words[words.length - 1] += '*'
-      return { words, weight: explicit ?? 1 + 0.5 * (words.length - 1), intent }
-    }),
-  )
+  .flatMap((intent) => intent.patterns.map((p) => ({ ...compilePattern(p), intent })))
   // Longest, then strongest, patterns claim their words first.
   .sort((a, b) => b.words.length - a.words.length || b.weight - a.weight)
 
 const wordMatches = (pattern: string, token: string) =>
   pattern.endsWith('*') ? token.startsWith(pattern.slice(0, -1)) : pattern === token
+
+// Does this sequence of pattern words appear in the message?
+function containsPattern(words: string[], tokens: string[]): boolean {
+  for (let i = 0; i + words.length <= tokens.length; i++) {
+    if (words.every((w, j) => wordMatches(w, tokens[i + j]))) return true
+  }
+  return false
+}
 
 function scoreIntents(tokens: string[]): Map<Intent, number> {
   const used = new Array<boolean>(tokens.length).fill(false)
@@ -110,11 +116,101 @@ function scoreIntents(tokens: string[]): Map<Intent, number> {
   return scores
 }
 
+// ── Facets ──────────────────────────────────────────────────────
+// An intent names the subject; a facet names the situation. "work" covers
+// both a crushing deadline and a boss who humiliated you, and those need
+// different answers — so each facet's cues are scored separately and the
+// strongest one replies. No cue matching means the intent's general lines.
+
+const facetCues = new WeakMap<Facet, { words: string[]; weight: number }[]>()
+
+function cuesFor(facet: Facet) {
+  let c = facetCues.get(facet)
+  if (!c) {
+    c = facet.cues.map(compilePattern)
+    facetCues.set(facet, c)
+  }
+  return c
+}
+
+function chooseFacet(intent: Intent, tokens: string[]): Facet | null {
+  if (!intent.facets) return null
+  let best: Facet | null = null
+  let bestScore = 0
+  for (const facet of intent.facets) {
+    let score = 0
+    for (const cue of cuesFor(facet)) {
+      if (containsPattern(cue.words, tokens)) score += cue.weight
+    }
+    if (score > bestScore) {
+      best = facet
+      bestScore = score
+    }
+  }
+  return bestScore > 0 ? best : null
+}
+
+// ── Naming what was said ────────────────────────────────────────
+// Echoing a fragment of the user's own words is the difference between
+// being answered and being processed. Only nouns that follow "my" are
+// echoed, and only from a known list, so Rama never parrots something
+// mangled back at someone who is upset.
+
+const POSSESSED: Record<string, string> = {
+  mom: 'your mother', mother: 'your mother', mum: 'your mother', mama: 'your mother',
+  dad: 'your father', father: 'your father', papa: 'your father', pop: 'your father',
+  brother: 'your brother', sister: 'your sister', parents: 'your parents',
+  son: 'your son', daughter: 'your daughter', child: 'your child', kid: 'your child',
+  wife: 'your wife', husband: 'your husband', partner: 'your partner',
+  girlfriend: 'your girlfriend', boyfriend: 'your boyfriend',
+  friend: 'your friend', friends: 'your friends', grandmother: 'your grandmother',
+  grandma: 'your grandmother', grandfather: 'your grandfather', grandpa: 'your grandfather',
+  boss: 'your boss', manager: 'your manager', teacher: 'your teacher',
+  job: 'your job', work: 'your work', career: 'your career', team: 'your team',
+  exam: 'your exam', exams: 'your exams', test: 'your test', interview: 'your interview',
+  thesis: 'your thesis', project: 'your project', presentation: 'your presentation',
+  deadline: 'your deadline', degree: 'your degree',
+  dog: 'your dog', cat: 'your cat', pet: 'your pet',
+  health: 'your health', body: 'your body', family: 'your family',
+}
+
+// "my dad is in the hospital" → "your father"
+function nameSubject(tokens: string[]): string | null {
+  for (let i = 0; i < tokens.length - 1; i++) {
+    if (tokens[i] !== 'my') continue
+    const named = POSSESSED[tokens[i + 1]]
+    if (named) return named
+  }
+  return null
+}
+
+// The subject is stored lowercase ("your father") because most templates
+// embed it mid-sentence; capitalise it when it opens one.
+function fillSubject(template: string, subject: string): string {
+  const named = template.startsWith('{it}')
+    ? subject.charAt(0).toUpperCase() + subject.slice(1)
+    : subject
+  return template.replace('{it}', named)
+}
+
 const MIN_SCORE = 0.5
 
-export function createRamaChat() {
+export function createRamaChat(): RamaMind {
   const recent = new Map<string, number[]>()
   let lastTopic: Intent | null = null
+  // The exact situation last answered. Staying on it earns the deeper
+  // lines; moving from a family argument to a family illness does not,
+  // even though both are the same intent.
+  let lastFacet: string | null = null
+  // How many messages in a row have landed on the same thing. A second
+  // message about it deserves more than the first line reworded.
+  let streak = 0
+  // Consecutive messages he has not understood. A thread survives a couple
+  // of them — "I don't know how to handle it" is still about the father in
+  // hospital — but not indefinitely, or "go on" would resurrect something
+  // the user left behind several messages ago.
+  let unrecognised = 0
+  const THREAD_PATIENCE = 2
 
   // Pick a line, avoiding the most recently used ones for that pool.
   const pick = (key: string, lines: string[]): string => {
@@ -127,13 +223,39 @@ export function createRamaChat() {
     return lines[index]
   }
 
-  const answer = (intent: Intent, ctx: ChatContext): string =>
-    intent.dynamic?.(ctx) ?? pick(intent.id, intent.responses)
+  // The intent's own text, preferring the facet that fits the situation and
+  // the deeper lines once the user has stayed on that exact situation.
+  // Updates the thread as a side effect, so the caller's streak reflects
+  // the facet that actually answered.
+  // `stay` is for "go on", which carries no cues of its own but is by
+  // definition a request to continue the situation already open.
+  const answer = (intent: Intent, tokens: string[], ctx: ChatContext, stay = false): string => {
+    const dynamic = intent.dynamic?.(ctx)
+    if (dynamic) {
+      lastFacet = null
+      streak = 0
+      return dynamic
+    }
+
+    const facet = stay
+      ? intent.facets?.find((f) => f.id === lastFacet) ?? null
+      : chooseFacet(intent, tokens)
+    const key = facet?.id ?? null
+    streak = stay || (intent === lastTopic && key === lastFacet) ? streak + 1 : 0
+    lastFacet = key
+
+    if (facet) {
+      if (streak > 0 && facet.deeper?.length) return pick(`${intent.id}:${facet.id}:deeper`, facet.deeper)
+      return pick(`${intent.id}:${facet.id}`, facet.responses)
+    }
+    if (streak > 0 && intent.deeper?.length) return pick(`${intent.id}:deeper`, intent.deeper)
+    return pick(intent.id, intent.responses)
+  }
 
   const holdFor = (text: string, intent: Intent | null) =>
     intent?.hold ?? Math.min(11000, Math.max(4500, 3000 + text.length * 50))
 
-  const reply = (message: string, ctx: ChatContext): ChatReply => {
+  const respond = (message: string, ctx: ChatContext): ChatReply => {
     const tokens = tokenize(message)
     const scores = scoreIntents(tokens)
     const ranked = [...scores.entries()]
@@ -145,38 +267,79 @@ export function createRamaChat() {
     const social = ranked.find((i) => i.social)
 
     if (topic) {
+      // answer() reads the thread to decide how deep to go, so it runs
+      // before lastTopic moves on.
+      let text = answer(topic, tokens, ctx)
       lastTopic = topic
-      let text = answer(topic, ctx)
-      // "Hi, I'm stressed" gets a greeting and an answer — but never
-      // prefix anything to the safety response.
-      if (social?.acks && !topic.priority) text = `${pick(`${social.id}:ack`, social.acks)} ${text}`
+      unrecognised = 0
+
+      // Name the thing they mentioned, but never in front of the safety
+      // response, and only when opening the subject — repeating it back
+      // every turn would sound like a machine, not a listener.
+      const subject = topic.reflects ? nameSubject(tokens) : null
+      if (subject && !topic.priority && streak === 0) {
+        text = `${fillSubject(pick('reflect', dialogue.reflections), subject)} ${text}`
+      } else if (social?.acks && !topic.priority) {
+        // "Hi, I'm stressed" gets a greeting and an answer.
+        text = `${pick(`${social.id}:ack`, social.acks)} ${text}`
+      }
       return { text, intent: topic.id, hold: holdFor(text, topic) }
     }
 
     if (social?.id === 'followUp') {
-      if (lastTopic && lastTopic.responses.length > 0) {
-        const text = pick(lastTopic.id, lastTopic.responses)
-        return { text, intent: lastTopic.id, hold: holdFor(text, lastTopic) }
+      if (lastTopic) {
+        const previous = lastTopic
+        const text = answer(previous, tokens, ctx, true)
+        lastTopic = previous
+        return { text, intent: previous.id, hold: holdFor(text, previous) }
       }
       const text = pick('nothingToContinue', dialogue.fallbacks.nothingToContinue)
       return { text, intent: null, hold: holdFor(text, null) }
     }
 
     if (social) {
-      const text = answer(social, ctx)
+      const text = answer(social, tokens, ctx)
+      lastTopic = null
+      lastFacet = null
+      streak = 0
       return { text, intent: social.id, hold: holdFor(text, social) }
     }
 
-    // Nothing recognised: answer the shape of the message instead.
+    // Nothing recognised. If something is already open, stay with it —
+    // a vague follow-up like "I don't know how to handle it" belongs to
+    // what was just said, and answering it with a stock line is how he
+    // loses the thread at the moment it matters most.
+    unrecognised += 1
+
+    // Naming someone new ("my dog") introduces a subject rather than
+    // continuing the old one, so it is checked before the open thread.
+    const subject = nameSubject(tokens)
+    if (subject) {
+      lastTopic = null
+      lastFacet = null
+      streak = 0
+      const text = fillSubject(pick('fallback:subject', dialogue.fallbacks.aboutSubject), subject)
+      return { text, intent: null, hold: holdFor(text, null) }
+    }
+
+    if (lastTopic && unrecognised <= THREAD_PATIENCE) {
+      const open = lastTopic
+      const text = answer(open, tokens, ctx, true)
+      lastTopic = open
+      return { text, intent: open.id, hold: holdFor(text, open) }
+    }
+
+    // Otherwise be curious rather than oracular — an aphorism aimed at a
+    // message he did not understand is what makes him seem deaf.
     lastTopic = null
+    lastFacet = null
+    streak = 0
     const isQuestion = message.includes('?') || QUESTION_WORDS.has(tokens[0] ?? '')
     const text = isQuestion
       ? pick('fallback:question', dialogue.fallbacks.question)
-      : Math.random() < 0.3
-        ? pick('idle', dialogue.idle)
-        : pick('fallback:statement', dialogue.fallbacks.statement)
+      : pick('fallback:statement', dialogue.fallbacks.statement)
     return { text, intent: null, hold: holdFor(text, null) }
   }
 
-  return { reply }
+  return { reply: (message, ctx) => Promise.resolve(respond(message, ctx)) }
 }

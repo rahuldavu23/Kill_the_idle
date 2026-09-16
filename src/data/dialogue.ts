@@ -20,10 +20,28 @@ export interface ChatContext {
 // may carry an explicit weight: [pattern, weight]. By default longer
 // phrases weigh more, and a phrase consumes its words so they can't also
 // count towards a shorter, vaguer pattern.
+// A situation inside a topic. "work" is a subject; "a boss who humiliated
+// you" and "a deadline closing in" are situations, and they do not share
+// answers. Cues are matched like patterns; the strongest-scoring facet
+// replies, and an intent with no matching facet uses its general lines.
+export interface Facet {
+  id: string
+  cues: (string | [string, number])[]
+  responses: string[]
+  // Used instead when the user stays on this facet — a second message
+  // about the same thing deserves more than the first line reworded.
+  deeper?: string[]
+}
+
 export interface Intent {
   id: string
   patterns: (string | [string, number])[]
   responses: string[]
+  facets?: Facet[]
+  deeper?: string[]
+  // Whether Rama may open by naming what the user mentioned ("Your father.").
+  // Off for topics where echoing would sound glib.
+  reflects?: boolean
   // Short lead-in used when this (social) intent comes paired with a
   // weightier one, e.g. "Hi, I'm stressed".
   acks?: string[]
@@ -97,6 +115,15 @@ export const dialogue = {
   },
 
   // When nothing in the message is recognised
+  // Openers that name what the user mentioned, so the reply begins with
+  // evidence of having listened. {it} becomes "your father", "your exam".
+  reflections: [
+    "{it}.",
+    "Ah — {it}.",
+    "So it is {it} that weighs on you.",
+    "{it}. I hear you.",
+  ],
+
   fallbacks: {
     question: [
       "That is a question worth sitting with. What does your own heart say?",
@@ -112,6 +139,14 @@ export const dialogue = {
       "Speak freely. There is no judgement here, only attention.",
       "Let us look at that together. What matters most to you in it?",
       "Words are the surface of the water. What moves below?",
+    ],
+    // He caught who or what it concerns, but not what is happening. Naming
+    // it and asking is far warmer than a wise-sounding guess.
+    aboutSubject: [
+      "{it}. Tell me what has happened.",
+      "Something about {it}, then. Say more — I am listening.",
+      "{it}. Go on. I would rather hear it in your own words.",
+      "So this concerns {it}. What is weighing on you there?",
     ],
     // When the user asks to go on but there is nothing to continue
     nothingToContinue: [
@@ -146,6 +181,16 @@ export const intents: Intent[] = [
       ['end my life', 5], ['want to die', 5], ['wanna die', 5], ['better off dead', 5],
       ['self harm', 5], ['hurt myself', 5], ['harm myself', 5], ['cut myself', 5],
       ["don't want to live", 5], ["don't want to be alive", 5], ['no reason to live', 5],
+      // Passive phrasings. People rarely reach for the explicit words first,
+      // and a platitude in reply to one of these is the worst thing he could
+      // do — so these are matched with the same weight.
+      ['nobody would notice if i', 5], ['no one would notice if i', 5],
+      ['better off without me', 5], ['everyone would be better off', 5],
+      ['wish i was dead', 5], ['wish i were dead', 5], ['wish i had never been born', 5],
+      ["don't want to be here", 5], ['do not want to wake up', 5], ["don't want to wake up", 5],
+      ['tired of living', 5], ['tired of being alive', 5], ['done with life', 5],
+      ['not worth living', 5], ['no point in living', 5], ['want it to stop', 4],
+      ['want to disappear', 4], ['wish i could disappear', 5], ['give up on life', 5],
     ],
     responses: [
       "I hear how much pain you are carrying, and I am glad you said it. Please reach out right now to someone who can be with you — in the US, call or text 988; elsewhere, your local emergency number or a crisis line. You deserve that support.",
@@ -398,6 +443,26 @@ export const intents: Intent[] = [
     patterns: [
       'happy', 'great', 'amazing', 'awesome', 'excited', 'glad', 'joy', 'wonderful', 'fantastic', 'proud',
       ['good day', 2.5], ['feel good', 2.5], ['feeling good', 2.5], ['doing well', 2.5], ['i did it', 3], ['good', 0.5],
+      // Good news, which is rarely announced with the word "happy".
+      ['i got the', 3], ['got the job', 4], ['got the promotion', 4], ['got in', 3], ['got accepted', 4],
+      ['i passed', 3.5], ['we won', 3.5], ['i won', 3.5], ['it worked', 3], ['finally done', 3.5],
+      ['finished it', 3], ['i finished', 3], ['celebrat*', 3],
+    ],
+    facets: [
+      {
+        id: 'achievement',
+        cues: [['got the', 3], ['passed', 3], ['won', 3], ['promotion', 3.5], ['accepted', 3], ['i did it', 3.5], ['finished', 2.5], ['scared', 2.5], ['worked hard', 3]],
+        responses: [
+          "Then stop and feel it properly, before the mind hurries you to the next thing. You earned this one.",
+          "Ha! Good. Tell someone who will be glad for you — joy grows in the telling.",
+          "You did the thing you were afraid of. Remember that the fear was not a prophecy.",
+          "Well done. Sit in it a moment. The next task can wait five minutes.",
+        ],
+        deeper: [
+          "What made it possible? Name it, so you can find it again on a harder day.",
+          "Hold it lightly — not to diminish it, but so the next thing is not made to carry the same weight.",
+        ],
+      },
     ],
     responses: [
       "This joy — hold it lightly. It is real, and it is yours right now.",
@@ -465,9 +530,59 @@ export const intents: Intent[] = [
   },
   {
     id: 'work',
+    reflects: true,
     patterns: [
       'exam*', ['test', 0.8], 'study', 'studying', 'homework', 'assignment', 'deadline*', 'boss', ['job', 0.9], ['work', 0.8],
       'interview', ['project', 0.8], 'presentation', 'essay', 'college', 'school', 'career', 'coworker*', 'meeting',
+    ],
+    facets: [
+      {
+        id: 'mistreated',
+        cues: [
+          ['humiliated', 4], ['embarrassed me', 4], ['shouted at', 3.5], ['yelled at', 3.5], ['in front of everyone', 4],
+          ['blamed me', 3.5], ['took credit', 4], ['belittled', 4], ['disrespected', 3.5], ['unfair', 2.5], ['bullied', 4],
+        ],
+        responses: [
+          "That was not yours to carry, and it says more of them than of you. Set it down where it belongs.",
+          "To be shamed in front of others cuts twice. Let the sting pass before you decide what to do — but do not mistake their cruelty for a verdict on your worth.",
+          "A person with power who uses it to make someone small has already lost something larger.",
+        ],
+        deeper: [
+          "Anger here is just. The question is only where to aim it — at them, or at building the thing that lets you walk away.",
+          "Is this once, or is this who they are? The answer decides whether you speak to them or start planning.",
+        ],
+      },
+      {
+        id: 'unprepared',
+        cues: [['tomorrow', 2.5], ['not studied', 4], ['have not studied', 4], ['no time', 3], ['running out of time', 4], ['behind', 2.5], ['last minute', 3.5], ['not ready', 3], ['not prepared', 3.5]],
+        responses: [
+          "Panic will not buy you the hours you did not spend. What it can still cost you is the hours you have.",
+          "You cannot learn everything now. Choose the few things most likely to matter and learn those properly.",
+          "One hour of calm work is worth three of frightened work. Begin with the piece you understand least.",
+        ],
+        deeper: [
+          "Sleep is part of the preparation, not a reward for finishing it. A rested mind recalls what a tired one cannot.",
+          "Do what you can tonight, then meet tomorrow as it comes. The outcome was never entirely yours to command.",
+        ],
+      },
+      {
+        id: 'overload',
+        cues: [['too much', 3], ['so much to do', 3.5], ['piling up', 3.5], ['drowning', 4], ['cannot keep up', 4], ['never ends', 3.5], ['everything at once', 4]],
+        responses: [
+          "You cannot carry the whole mountain. Pick up one stone, move it, and look again.",
+          "Much of what feels urgent is only loud. Name the one thing that would matter if nothing else got done.",
+          "Break it into pieces small enough that you cannot refuse to start.",
+        ],
+      },
+      {
+        id: 'quitting',
+        cues: [['quit', 3], ['resign', 3.5], ['leave my job', 4], ['new job', 3], ['hate my job', 4], ['hate this job', 4]],
+        responses: [
+          "Do not decide this on your worst day. Decide it on an ordinary one, when the feeling is quieter and truer.",
+          "Ask what you are walking towards, not only what you are escaping. The second alone leads to the same place again.",
+          "There is no honour in staying where you are diminished. But leave by choice, not by exhaustion.",
+        ],
+      },
     ],
     responses: [
       "Treat the work as an offering, not a burden. Do it well, and leave the result to time.",
@@ -483,6 +598,33 @@ export const intents: Intent[] = [
     patterns: [
       'failed', 'failure', 'failing', ['not good enough', 3.5], 'worthless', 'useless', ['imposter', 2.5], ['impostor', 2.5],
       ['messed up', 3], 'mistake*', 'regret*', ['give up', 3], ['giving up', 3], ['want to quit', 3], ['screwed up', 3], ['i suck', 3],
+    ],
+    facets: [
+      {
+        id: 'shame',
+        cues: [
+          ['drank', 3.5], ['drunk', 3], ['too much', 2], ['ashamed', 4], ['embarrassed', 3.5], ['cringe', 3],
+          ['said something stupid', 4], ['should not have', 3], ['cannot believe i', 3.5], ['made a fool', 4],
+        ],
+        responses: [
+          "You are not the first to wake up wishing for yesterday back, and you will not be the last. Make amends if any are owed, then let it close.",
+          "Shame wants you to believe the act was the whole of you. It was not. It was one evening.",
+          "Regret that changes tomorrow is useful. Regret that only replays last night is not — and you can tell the difference by how it feels.",
+        ],
+        deeper: [
+          "Is there anyone you should say a plain word to? Not a speech. One honest sentence usually settles it.",
+          "Ask what you were reaching for when you reached too far. That is the part worth understanding.",
+        ],
+      },
+      {
+        id: 'repeating',
+        cues: [['keep', 2.5], ['again', 2], ['always', 2.5], ['every time', 3.5], ['never learn', 4], ['same mistake', 4], ['over and over', 4]],
+        responses: [
+          "A pattern is not a character flaw. It is a groove worn by circumstance — and grooves can be filled in.",
+          "If it keeps happening, stop asking what is wrong with you and start asking what the situation keeps offering you.",
+          "You notice the pattern. That is the part most people never reach. Now change one small thing in it.",
+        ],
+      },
     ],
     responses: [
       "A fall is not the end of the path. It is simply where you stand up again.",
@@ -512,6 +654,10 @@ export const intents: Intent[] = [
     patterns: [
       ['meaning of life', 4], ['purpose', 2], ['why am i here', 4], 'dharma', ['what is life', 3.5], ['point of life', 4],
       ['point of it all', 4], ['what is the point', 3], 'karma', 'destiny', 'fate',
+      // The flat, weary way the question actually gets asked.
+      ['does any of this matter', 4], ['does it even matter', 4], ['does anything matter', 4],
+      ['what is it all for', 4], ['why bother', 3.5], ['nothing matters', 4], ['pointless', 3],
+      ['no point', 2.5], ['meaningless', 3.5],
     ],
     responses: [
       "Your dharma is not found in a book. It is found where your gifts meet the world's need.",
@@ -523,16 +669,67 @@ export const intents: Intent[] = [
   },
   {
     id: 'relationships',
+    reflects: true,
     patterns: [
       'family', 'parents', ['mom', 0.9], ['mum', 0.9], ['dad', 0.9], ['brother', 0.9], ['sister', 0.9], ['friend', 0.8], 'friends',
       'argument', 'fight', 'fighting', 'forgive*', 'betray*', 'jealous*', 'envy', 'envious', 'toxic', 'drama',
+    ],
+    facets: [
+      {
+        id: 'illness',
+        cues: [['hospital', 3], ['in hospital', 4], ['sick', 2.5], ['ill', 2], ['cancer', 4], ['dying', 4], ['surgery', 3], ['diagnosed', 4], ['intensive care', 4], ['not well', 2.5]],
+        responses: [
+          "That is a heavy thing to sit with, and there is no cleverness that helps. Be there, and let that be enough.",
+          "When someone we love is unwell, the mind runs ahead to every ending. Bring it back. Today they are here, and so are you.",
+          "You cannot heal them by worrying well. Go, sit with them, and let your presence do what words cannot.",
+        ],
+        deeper: [
+          "Tell me — are you being looked after too? The ones who hold everyone up are the ones most often forgotten.",
+          "There is grief in waiting, even before anything is lost. You are allowed to feel it now.",
+        ],
+      },
+      {
+        id: 'conflict',
+        cues: [['argument', 2.5], ['argued', 3], ['fight', 2], ['fought', 3], ['shouted', 3], ['yelled', 3], ['angry at', 2.5], ['not speaking', 3], ['fell out', 3], ['said something', 2]],
+        responses: [
+          "Before the next word, ask: do I want to win, or do I want peace? They are rarely the same road.",
+          "Speak your truth without a weapon in your voice. The truth lands better when it is not thrown.",
+          "You can be right and still lose something worth more than being right.",
+        ],
+        deeper: [
+          "What would you want them to understand, if you knew they would not argue back? Start there.",
+          "My own stepmother sent me to the forest, and still I bore her no hatred. Hatred would have exiled me twice.",
+        ],
+      },
+      {
+        id: 'distance',
+        cues: [['avoiding', 3], ['ignoring', 3], ['ghosted', 3], ['stopped talking', 3], ['left out', 3], ['excluded', 3], ['drifting', 3], ['grew apart', 3], ['does not reply', 3], ['never texts', 3]],
+        responses: [
+          "Distance is not always rejection. Often it is someone else's storm, and you are reading yourself into it.",
+          "You could spend a week guessing, or you could ask them plainly. One of those ends the ache.",
+          "Hold the door open without standing in it. If they come back, good. If not, you have not lost yourself waiting.",
+        ],
+        deeper: [
+          "Send one honest message. Not an accusation — a door. Then let it be theirs to walk through.",
+          "Some friendships are for a season. Ending is not the same as failing.",
+        ],
+      },
+      {
+        id: 'betrayal',
+        cues: [['betray*', 3], ['lied to me', 3], ['cheated', 3], ['went behind my back', 4], ['broke my trust', 4], ['used me', 3], ['toxic', 2.5]],
+        responses: [
+          "Trust broken is a real wound. Do not let anyone hurry you past it.",
+          "Forgiveness is not agreement, and it is not a door left open. It is setting down a stone you were never meant to carry.",
+          "You may forgive and still keep your distance. Those are two separate decisions, and both are yours.",
+        ],
+      },
     ],
     responses: [
       "Family can wound, and family can heal. Speak your truth without a weapon in your voice.",
       "Forgiveness is not agreement. It is setting down a stone you were never meant to carry.",
       "My own stepmother sent me to the forest, and still I bore her no hatred. Hatred would have exiled me twice.",
-      "Envy measures your life with someone else's ruler. Put it down — walk your own path.",
       "Before the next argument, ask: do I want to win, or do I want peace?",
+      "Tell me more of how things stand between you.",
     ],
   },
   {
@@ -566,6 +763,175 @@ export const intents: Intent[] = [
       "Sit quietly for a few breaths. Stillness is the doorway every tradition points to.",
       "You have my blessing. Now bless your day with one good act.",
       "Faith is not certainty. It is taking the next step while the path is still dark.",
+    ],
+  },
+
+  // ── Topics that used to fall through ──────────────────────────
+  {
+    id: 'grief',
+    reflects: true,
+    priority: 5, // Outranks 'relationships' and 'health' when someone has died.
+    patterns: [
+      ['passed away', 4], ['died', 3.5], ['death', 3], ['funeral', 4], ['lost my', 3], ['he is gone', 3.5],
+      ['she is gone', 3.5], ['put down', 3], ['put to sleep', 3.5], ['bereaved', 4], ['mourning', 3.5],
+    ],
+    responses: [
+      "I am sorry. There is nothing wise to say to this, and anyone who offers you cleverness now has not understood.",
+      "Grief is love with nowhere left to go. It is heavy because it was real.",
+      "Do not measure this against how long you think it should take. It takes what it takes.",
+      "Let yourself be looked after today. You would do it for anyone else in this.",
+    ],
+    deeper: [
+      "Tell me about them. The remembering is part of the carrying, and it helps to say it aloud.",
+      "The sharpness dulls, slowly, and what stays is the having-known-them. That part does not leave.",
+      "Eat something. Sleep if you can. Grief is physical, and the body is doing work you cannot see.",
+    ],
+  },
+  {
+    id: 'selfCriticism',
+    patterns: [
+      ['hard on myself', 4], ['hate myself', 4], ['so stupid', 3.5], ['what is wrong with me', 4],
+      ['why do i keep', 3.5], ['i always ruin', 4], ['i never do anything right', 4], ['blame myself', 4],
+      ['my own worst enemy', 4], ['beating myself up', 4], ['not smart enough', 3.5],
+    ],
+    responses: [
+      "You are speaking to yourself in a voice you would never use on a friend. Notice that — it is the whole problem in one sentence.",
+      "That voice is not truth, it is only loud. Loudness is not evidence.",
+      "You would forgive anyone else this. Extend yourself the ordinary mercy you hand out freely.",
+      "Being hard on yourself feels like discipline. It is not. It is just cruelty with better marketing.",
+    ],
+    deeper: [
+      "Whose voice is it, when you say those things? Most people find it is not originally their own.",
+      "Try this: say the same thing about the person you love most. If it is monstrous there, it is monstrous here.",
+    ],
+  },
+  {
+    id: 'comparison',
+    patterns: [
+      ['comparing myself', 4], ['compare myself', 4], ['everyone else is', 3.5], ['ahead of me', 3.5],
+      ['behind everyone', 4], ['left behind', 3.5], ['social media', 3], ['instagram', 3], ['linkedin', 3],
+      ['everyone is doing better', 4], ['falling behind', 3.5], ['my age', 2.5],
+    ],
+    responses: [
+      "Envy measures your life with someone else's ruler. Put it down — it was never cut for your path.",
+      "You are comparing everything you know of yourself against everything they chose to show. That is not a fair contest.",
+      "There is no schedule. The idea that you are late is borrowed from people who are not living your life.",
+      "Look at where you stood a year ago, not at where someone else stands today. That is the only honest comparison.",
+    ],
+    deeper: [
+      "If they vanished tomorrow, would you still want the thing you are chasing? That answer tells you whether it is yours.",
+      "Close the feed for a day. Much of this feeling is manufactured, and it does fade when you stop refilling it.",
+    ],
+  },
+  {
+    id: 'identity',
+    patterns: [
+      ['who i am', 3.5], ['do not know who i am', 4], ['lost myself', 4], ['not myself', 3.5],
+      ['what i want', 3], ['pretending to be', 3.5], ['fake', 2], ['do not recognise myself', 4],
+      ['who am i', 4], ['find myself', 3.5],
+    ],
+    responses: [
+      "Not knowing is uncomfortable, but it is not the same as being lost. It is the space before a truer answer.",
+      "You are not a fixed thing you must correctly identify. You are what you keep choosing.",
+      "When I was stripped of throne and name, I was still the one who kept his word. Take away your titles — what remains is you.",
+      "Stop asking who you are and watch what you do when no one is asking. The answer is already in your days.",
+    ],
+    deeper: [
+      "Name one thing you did this week that felt like you, and one that did not. Start the map there.",
+      "Much of this comes from living to someone else's specification. Whose approval are you still arranging your life around?",
+    ],
+  },
+  {
+    id: 'guilt',
+    patterns: [
+      ['guilty for', 3.5], ['feel guilty', 3.5], ['guilt', 2.5], ['selfish', 3], ['do not deserve', 3.5],
+      ['should be working', 3.5], ['wasting the day', 3.5], ['lazy for resting', 4], ['taking a break', 2.5],
+    ],
+    responses: [
+      "Rest is not a debt you must repay. You are not a machine whose idle hours need justifying.",
+      "Guilt about resting is a sign you have been taught your worth is your output. It is not, and it never was.",
+      "The bow that is never unstrung loses its spring. Rest is part of the work, not a theft from it.",
+      "You are allowed the afternoon. Take it fully, or the rest will not restore you at all.",
+    ],
+    deeper: [
+      "Notice you feel guilty resting but not guilty exhausting yourself. That asymmetry is worth questioning.",
+      "Ask who taught you that stillness must be earned. They were probably tired too.",
+    ],
+  },
+  {
+    id: 'nostalgia',
+    reflects: true,
+    patterns: [
+      ['miss my', 3.5], ['miss home', 4], ['homesick', 4], ['used to be', 3], ['back then', 3.5],
+      ['the old days', 3.5], ['childhood', 3], ['nostalgi*', 3.5], ['wish things were', 3.5], ['simpler time', 3.5],
+    ],
+    responses: [
+      "Missing a place is really missing the person you were in it. Both are worth honouring.",
+      "I spent fourteen years away from home. What I longed for was not the walls — it was belonging. That you can rebuild anywhere.",
+      "The past is warm partly because you already know how it ends. The present has no such comfort, and that is not a fault in it.",
+      "Let yourself miss it without concluding that the best is behind you. Those are two different feelings.",
+    ],
+  },
+  {
+    id: 'doubtInRama',
+    patterns: [
+      ['you do not understand', 3.5], ['you would not understand', 4], ['you are just a', 3.5],
+      ['that does not help', 3.5], ['easy for you to say', 4], ['you do not know me', 4],
+      ['generic', 3], ['same thing every time', 4],
+    ],
+    responses: [
+      "You are right to push back. I am a small voice in a window, not someone who has lived your life.",
+      "Fair. Tell me what you actually need — to be advised, or simply to be heard? I will do the one you ask for.",
+      "Then say it plainly and I will try again. I would rather be corrected than comfortable.",
+      "I cannot know your life from here. But I can pay attention, if you will keep speaking.",
+    ],
+  },
+  {
+    id: 'wisdomRequest',
+    patterns: [
+      ['tell me something wise', 4], ['give me advice', 3.5], ['any advice', 3.5], ['words of wisdom', 4],
+      ['inspire me', 3.5], ['motivate me', 3.5], ['something to think about', 4], ['teach me', 3],
+    ],
+    responses: [
+      "Very well. Act well in this moment — it is the only one you are ever given to act in.",
+      "Here is one: you cannot control the wind, but you can adjust your sails.",
+      "Do your duty without clutching at its fruits. The work is yours; the outcome never entirely was.",
+      "The river does not mourn the banks it has passed. Neither should you.",
+      "Detachment is not indifference. It is clarity — caring fully, while holding loosely.",
+    ],
+    deeper: [
+      "But wisdom borrowed is only decoration. Which of these would change what you do in the next hour?",
+      "Enough aphorisms. Tell me what is actually in front of you and I will speak to that instead.",
+    ],
+  },
+  {
+    id: 'money',
+    patterns: [
+      ['money', 2.5], ['broke', 2.5], ['rent', 3], ['debt', 3.5], ['bills', 3], ['afford', 3],
+      ['salary', 3], ['poor', 2.5], ['rich', 2.5], ['greedy', 3], ['wealth', 3],
+    ],
+    responses: [
+      "There is no virtue in want for its own sake. Wanting enough to live without fear is not greed.",
+      "Money is a tool, not a verdict on your worth. Trouble comes when we confuse the two.",
+      "Worry about money is heavy precisely because it is real. What is the one practical step available this week?",
+      "A kingdom did not make me content, and losing it did not make me poor. Hold it lightly — but do tend to it.",
+    ],
+  },
+  {
+    id: 'distraction',
+    patterns: [
+      ['scrolling', 3.5], ['on my phone', 3.5], ['keep checking', 3.5], ['youtube', 3], ['tiktok', 3],
+      ['cannot stop watching', 4], ['doom scroll*', 4], ['keep getting distracted', 4], ['notifications', 3],
+    ],
+    responses: [
+      "The feed is built to hold you. Losing to it is not a character failure — but you can make it harder to win.",
+      "Put the phone in another room. Not off, not face down — another room. Distance does what willpower cannot.",
+      "You are not lazy. You are being outmatched by something engineered by many clever people. Change the field, not yourself.",
+      "Set a timer for five minutes on the real thing. You may stop after — you probably won't.",
+    ],
+    deeper: [
+      "Notice what you reach for the phone to avoid. The scrolling is usually the symptom, not the sickness.",
+      "What is the smallest possible version of the thing you are avoiding? Do only that.",
     ],
   },
 ]
