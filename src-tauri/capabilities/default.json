@@ -1,0 +1,15 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "What the frameless window needs in order to be moved, put away and pinned from its own titlebar.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "core:window:allow-start-dragging",
+    "core:window:allow-minimize",
+    "core:window:allow-hide",
+    "core:window:allow-close",
+    "core:window:allow-is-always-on-top",
+    "core:window:allow-set-always-on-top"
+  ]
+}

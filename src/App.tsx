@@ -4,36 +4,38 @@ import Rama from './components/Rama'
 import SpeechBubble from './components/SpeechBubble'
 import { dialogue, randomFrom, getGreeting, type RamaMood } from './data/dialogue'
 import { createRamaChat } from './data/chat'
-import { todayKey, formatDay, loadToday, saveToday, moveTask, type TodayTask } from './data/todayTasks'
-
-interface Task {
-  id: number
-  text: string
-  done: boolean
-}
-
-interface EnjoyItem {
-  id: number
-  text: string
-}
+import {
+  loadData,
+  saveData,
+  todayKey,
+  shiftDay,
+  formatDay,
+  dayTasks,
+  previousDayWithContent,
+  moveTask,
+  newId,
+  type AppData,
+  type Task,
+} from './data/store'
 
 export default function App() {
   const [message, setMessage]      = useState('')
   const [bubbleVisible, setBubble] = useState(false)
   const [mood, setMood]            = useState<RamaMood>('idle')
 
-  const [tasks, setTasks]         = useState<Task[]>([])
-  const [taskInput, setTaskInput] = useState('')
+  // Everything persisted lives in one document, so there is a single place
+  // that is read on open and a single place that is written on change.
+  const [data, setData] = useState<AppData>(loadData)
 
-  const [enjoys, setEnjoys]         = useState<EnjoyItem[]>([])
-  const [enjoyInput, setEnjoyInput] = useState('')
+  // The real calendar day, and the day being looked at. They are the same
+  // until the user browses back through history.
+  const [liveDay, setLiveDay] = useState(todayKey)
+  const [viewDay, setViewDay] = useState(todayKey)
 
-  // Today's plan — an ordered list tied to the calendar day it was written on.
-  const [dayKey, setDayKey]       = useState(todayKey)
-  const [today, setToday]         = useState<TodayTask[]>(() => loadToday(todayKey()))
-  const [todayInput, setTodayInput] = useState('')
-
-  const [userInput, setUserInput] = useState('')
+  const [projectInput, setProjectInput] = useState('')
+  const [enjoyInput, setEnjoyInput]     = useState('')
+  const [dayInput, setDayInput]         = useState('')
+  const [userInput, setUserInput]       = useState('')
 
   // One chat engine for the session, so it remembers the last topic and
   // which lines it has used recently.
@@ -90,65 +92,101 @@ export default function App() {
     return () => clearInterval(idleTimer)
   }, [showMessage])
 
-  // Tasks
-  const addTask = () => {
-    const text = taskInput.trim()
-    if (!text) return
-    setTasks(prev => [...prev, { id: Date.now(), text, done: false }])
-    setTaskInput('')
-    showMessage(randomFrom(dialogue.taskAdded), 'happy', 5000)
-  }
+  // ─── Persistence ───────────────────────────────────────────────────────
 
-  const toggleTask = (id: number) => {
-    const task = tasks.find(t => t.id === id)
-    if (!task) return
-    if (!task.done) showMessage(randomFrom(dialogue.taskCompleted), 'amused', 5000)
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, done: !t.done } : t))
-  }
+  // Written on every change, including the first — which is what commits a
+  // migration from an older format to disk.
+  useEffect(() => saveData(data), [data])
 
-  const removeTask = (id: number) => setTasks(prev => prev.filter(t => t.id !== id))
-
-  // Enjoy list
-  const addEnjoy = () => {
-    const text = enjoyInput.trim()
-    if (!text) return
-    setEnjoys(prev => [...prev, { id: Date.now(), text }])
-    setEnjoyInput('')
-  }
-
-  const removeEnjoy = (id: number) => setEnjoys(prev => prev.filter(e => e.id !== id))
-
-  // Today's plan — persisted under the day it belongs to
-  useEffect(() => saveToday(dayKey, today), [dayKey, today])
-
-  // If the app is left open past midnight, the plan on screen stops being
-  // today's. Roll over to the new day and start it clean.
+  // If the app is left open past midnight the plan on screen stops being
+  // today's. Follow the new day, but only drag the view along if it was
+  // sitting on the day that just ended rather than on history.
   useEffect(() => {
     const rollover = setInterval(() => {
       const key = todayKey()
-      if (key === dayKey) return
-      setDayKey(key)
-      setToday(loadToday(key))
+      if (key === liveDay) return
+      setLiveDay(key)
+      setViewDay(current => (current === liveDay ? key : current))
     }, 30000)
     return () => clearInterval(rollover)
-  }, [dayKey])
+  }, [liveDay])
 
-  const addTodayTask = () => {
-    const text = todayInput.trim()
+  // ─── Projects — long-term, carried forward until finished ──────────────
+
+  const addProject = () => {
+    const text = projectInput.trim()
     if (!text) return
-    setToday(prev => [...prev, { id: Date.now(), text, done: false }])
-    setTodayInput('')
+    setData(prev => ({
+      ...prev,
+      projects: [...prev.projects, { id: newId(), text, done: false, addedOn: liveDay, doneOn: null }],
+    }))
+    setProjectInput('')
     showMessage(randomFrom(dialogue.taskAdded), 'happy', 5000)
   }
 
-  const toggleTodayTask = (id: number) => {
-    const task = today.find(t => t.id === id)
+  const toggleProject = (id: string) => {
+    const project = data.projects.find(p => p.id === id)
+    if (!project) return
+    setData(prev => ({
+      ...prev,
+      projects: prev.projects.map(p =>
+        p.id === id ? { ...p, done: !p.done, doneOn: p.done ? null : liveDay } : p,
+      ),
+    }))
+    if (!project.done) showMessage(randomFrom(dialogue.taskCompleted), 'amused', 5000)
+  }
+
+  const removeProject = (id: string) =>
+    setData(prev => ({ ...prev, projects: prev.projects.filter(p => p.id !== id) }))
+
+  const clearFinishedProjects = () =>
+    setData(prev => ({ ...prev, projects: prev.projects.filter(p => !p.done) }))
+
+  // ─── Enjoy — a standing list, not tied to any day ──────────────────────
+
+  const addEnjoy = () => {
+    const text = enjoyInput.trim()
+    if (!text) return
+    setData(prev => ({ ...prev, enjoys: [...prev.enjoys, { id: newId(), text }] }))
+    setEnjoyInput('')
+  }
+
+  const removeEnjoy = (id: string) =>
+    setData(prev => ({ ...prev, enjoys: prev.enjoys.filter(e => e.id !== id) }))
+
+  // ─── The day's plan — one ordered list per calendar day ────────────────
+
+  // Every day edit goes through here, so a day that empties out is removed
+  // rather than left behind as a stored empty list.
+  const setDay = (key: string, update: (tasks: Task[]) => Task[]) =>
+    setData(prev => {
+      const next = update(prev.days[key] ?? [])
+      const days = { ...prev.days }
+      if (next.length > 0) days[key] = next
+      else delete days[key]
+      return { ...prev, days }
+    })
+
+  const viewTasks = dayTasks(data, viewDay)
+  const isToday = viewDay === liveDay
+
+  const addDayTask = () => {
+    const text = dayInput.trim()
+    if (!text || !isToday) return
+    setDay(viewDay, tasks => [...tasks, { id: newId(), text, done: false }])
+    setDayInput('')
+    showMessage(randomFrom(dialogue.taskAdded), 'happy', 5000)
+  }
+
+  const toggleDayTask = (id: string) => {
+    const task = viewTasks.find(t => t.id === id)
     if (!task) return
-    const next = today.map(t => t.id === id ? { ...t, done: !t.done } : t)
-    setToday(next)
+    const next = viewTasks.map(t => (t.id === id ? { ...t, done: !t.done } : t))
+    setDay(viewDay, () => next)
     if (task.done) return
-    // Finishing the last one is a bigger moment than finishing any other.
-    const finished = next.every(t => t.done)
+    // Finishing the last one is a bigger moment than finishing any other —
+    // but only while the day in question is still the one being lived.
+    const finished = isToday && next.every(t => t.done)
     showMessage(
       randomFrom(finished ? dialogue.dayComplete : dialogue.taskCompleted),
       finished ? 'happy' : 'amused',
@@ -156,14 +194,18 @@ export default function App() {
     )
   }
 
-  const removeTodayTask = (id: number) => setToday(prev => prev.filter(t => t.id !== id))
+  const removeDayTask = (id: string) =>
+    setDay(viewDay, tasks => tasks.filter(t => t.id !== id))
 
-  const reorderTodayTask = (id: number, delta: -1 | 1) => setToday(prev => moveTask(prev, id, delta))
+  const reorderDayTask = (id: string, delta: -1 | 1) =>
+    setDay(viewDay, tasks => moveTask(tasks, id, delta))
 
-  // Talk to Rama — a short thinking pause, then a reply to what was said.
-  // The mind is async so a slower one can be swapped in; the pause is a
-  // floor, not a fixed wait, so a reply that takes longer simply lands when
-  // it is ready rather than being rushed on screen.
+  // ─── Talking to Rama ───────────────────────────────────────────────────
+
+  // A short thinking pause, then a reply to what was said. The mind is
+  // async so a slower one can be swapped in; the pause is a floor, not a
+  // fixed wait, so a reply that takes longer simply lands when it is ready
+  // rather than being rushed on screen.
   const talkToRama = async () => {
     const text = userInput.trim()
     if (!text) return
@@ -180,10 +222,11 @@ export default function App() {
 
     const [reply] = await Promise.all([
       chat.reply(text, {
-        pendingTasks: tasks.filter(t => !t.done).map(t => t.text),
-        doneTasks: tasks.filter(t => t.done).length,
-        enjoys: enjoys.map(e => e.text),
-        todayTasks: today.filter(t => !t.done).map(t => t.text),
+        pendingTasks: data.projects.filter(p => !p.done).map(p => p.text),
+        doneTasks: data.projects.filter(p => p.done).length,
+        enjoys: data.enjoys.map(e => e.text),
+        // Always the real today, whatever day is being looked at.
+        todayTasks: dayTasks(data, liveDay).filter(t => !t.done).map(t => t.text),
       }),
       new Promise(resolve => setTimeout(resolve, pause)),
     ])
@@ -192,43 +235,59 @@ export default function App() {
     showMessage(reply.text, 'speaking', reply.hold)
   }
 
-  // The first unfinished step is the one the whole panel points at.
-  const nextStep = today.findIndex(t => !t.done)
-  const doneToday = today.filter(t => t.done).length
-
   const handleRamaClick = () => {
     if (!bubbleVisible && !busyRef.current) showMessage(randomFrom(dialogue.idle), 'thinking', 5000)
   }
 
+  // ─── Derived view state ────────────────────────────────────────────────
+
+  // The first unfinished step is the one the whole panel points at.
+  const nextStep = viewTasks.findIndex(t => !t.done)
+  const doneCount = viewTasks.filter(t => t.done).length
+  const finishedProjects = data.projects.filter(p => p.done).length
+  const jumpBack = previousDayWithContent(data, viewDay)
+
   return (
     <div className="app-shell">
 
-      {/* LEFT PANEL — focus tasks */}
+      {/* LEFT PANEL — projects that outlive a single day */}
       <div className="task-panel left">
-        <h2 className="panel-title">Focus</h2>
+        <h2 className="panel-title">Projects</h2>
 
         <div className="panel-input-row">
           <input
             className="panel-input"
-            value={taskInput}
-            onChange={e => setTaskInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && addTask()}
-            placeholder="Add a task..."
+            value={projectInput}
+            onChange={e => setProjectInput(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && addProject()}
+            placeholder="Something ongoing..."
           />
-          <button className="panel-add-btn" onClick={addTask}>+</button>
+          <button className="panel-add-btn" onClick={addProject}>+</button>
         </div>
 
         <ul className="panel-list">
-          {tasks.map(task => (
-            <li key={task.id} className={`panel-item ${task.done ? 'panel-item--done' : ''}`}>
-              <button className="item-check" onClick={() => toggleTask(task.id)} aria-label="Toggle task">
-                {task.done ? '✓' : ''}
+          {data.projects.map(project => (
+            <li key={project.id} className={`panel-item ${project.done ? 'panel-item--done' : ''}`}>
+              <button className="item-check" onClick={() => toggleProject(project.id)} aria-label="Toggle project">
+                {project.done ? '✓' : ''}
               </button>
-              <span className="item-text">{task.text}</span>
-              <button className="item-remove" onClick={() => removeTask(task.id)} aria-label="Remove">×</button>
+              <span className="item-text">
+                {project.text}
+                {/* Carried forward — worth seeing how long it has been waiting. */}
+                {!project.done && project.addedOn !== liveDay && (
+                  <span className="item-since">since {formatDay(project.addedOn)}</span>
+                )}
+              </span>
+              <button className="item-remove" onClick={() => removeProject(project.id)} aria-label="Remove">×</button>
             </li>
           ))}
         </ul>
+
+        {finishedProjects > 0 && (
+          <button className="panel-foot-btn" onClick={clearFinishedProjects}>
+            Clear {finishedProjects} finished
+          </button>
+        )}
       </div>
 
       {/* CENTER STAGE */}
@@ -269,7 +328,7 @@ export default function App() {
         </div>
 
         <ul className="panel-list">
-          {enjoys.map(item => (
+          {data.enjoys.map(item => (
             <li key={item.id} className="panel-item">
               <span className="item-bullet">◆</span>
               <span className="item-text">{item.text}</span>
@@ -279,61 +338,97 @@ export default function App() {
         </ul>
       </div>
 
-
-      {/* BOTTOM PANEL — today's plan, in the order it should be done */}
-      <div className="task-panel today">
+      {/* BOTTOM PANEL — one day's plan, in the order it should be done */}
+      <div className={`task-panel today${isToday ? '' : ' today--past'}`}>
         <div className="today-head">
-          <h2 className="panel-title">Today · in order</h2>
-          <span className="today-date">{formatDay(dayKey)}</span>
+          <h2 className="panel-title">{isToday ? 'Today · in order' : 'That day · in order'}</h2>
+
+          <div className="day-nav">
+            <button
+              className="day-nav-btn"
+              onClick={() => setViewDay(shiftDay(viewDay, -1))}
+              aria-label="Previous day"
+            >◀</button>
+            <span className="today-date">{formatDay(viewDay)}</span>
+            <button
+              className="day-nav-btn"
+              onClick={() => setViewDay(shiftDay(viewDay, 1))}
+              disabled={isToday}
+              aria-label="Next day"
+            >▶</button>
+            {!isToday && (
+              <button className="day-nav-today" onClick={() => setViewDay(liveDay)}>Today</button>
+            )}
+          </div>
         </div>
 
-        <div className="panel-input-row">
-          <input
-            className="panel-input"
-            value={todayInput}
-            onChange={e => setTodayInput(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && addTodayTask()}
-            placeholder="Next thing to do today..."
-          />
-          <button className="panel-add-btn" onClick={addTodayTask}>+</button>
-        </div>
+        {isToday ? (
+          <div className="panel-input-row">
+            <input
+              className="panel-input"
+              value={dayInput}
+              onChange={e => setDayInput(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addDayTask()}
+              placeholder="Next thing to do today..."
+            />
+            <button className="panel-add-btn" onClick={addDayTask}>+</button>
+          </div>
+        ) : (
+          // A finished day can still be ticked off, but not added to — new
+          // work belongs to the day you are actually in.
+          <p className="today-readonly">
+            Looking back. You can still tick these off; new items go on today's list.
+          </p>
+        )}
 
-        {today.length === 0 ? (
-          <p className="today-empty">Nothing planned yet. Name the first thing you mean to do today.</p>
+        {viewTasks.length === 0 ? (
+          <p className="today-empty">
+            {isToday
+              ? 'Nothing planned yet. Name the first thing you mean to do today.'
+              : 'Nothing was written down for this day.'}
+            {jumpBack && (
+              <button className="today-jump" onClick={() => setViewDay(jumpBack)}>
+                ◀ {formatDay(jumpBack)}
+              </button>
+            )}
+          </p>
         ) : (
           <ol className="panel-list today-list">
-            {today.map((task, index) => (
+            {viewTasks.map((task, index) => (
               <li
                 key={task.id}
-                className={`panel-item today-item${task.done ? ' panel-item--done' : ''}${index === nextStep ? ' today-item--next' : ''}`}
+                className={`panel-item today-item${task.done ? ' panel-item--done' : ''}${index === nextStep && isToday ? ' today-item--next' : ''}`}
               >
                 <span className="today-step">{index + 1}</span>
-                <button className="item-check" onClick={() => toggleTodayTask(task.id)} aria-label="Toggle task">
+                <button className="item-check" onClick={() => toggleDayTask(task.id)} aria-label="Toggle task">
                   {task.done ? '✓' : ''}
                 </button>
                 <span className="item-text">{task.text}</span>
-                <span className="today-move">
-                  <button
-                    className="today-move-btn"
-                    onClick={() => reorderTodayTask(task.id, -1)}
-                    disabled={index === 0}
-                    aria-label="Move earlier"
-                  >▲</button>
-                  <button
-                    className="today-move-btn"
-                    onClick={() => reorderTodayTask(task.id, 1)}
-                    disabled={index === today.length - 1}
-                    aria-label="Move later"
-                  >▼</button>
-                </span>
-                <button className="item-remove" onClick={() => removeTodayTask(task.id)} aria-label="Remove">×</button>
+                {/* Reordering a day that is already over has no meaning. */}
+                {isToday && (
+                  <span className="today-move">
+                    <button
+                      className="today-move-btn"
+                      onClick={() => reorderDayTask(task.id, -1)}
+                      disabled={index === 0}
+                      aria-label="Move earlier"
+                    >▲</button>
+                    <button
+                      className="today-move-btn"
+                      onClick={() => reorderDayTask(task.id, 1)}
+                      disabled={index === viewTasks.length - 1}
+                      aria-label="Move later"
+                    >▼</button>
+                  </span>
+                )}
+                <button className="item-remove" onClick={() => removeDayTask(task.id)} aria-label="Remove">×</button>
               </li>
             ))}
           </ol>
         )}
 
-        {today.length > 0 && (
-          <div className="today-progress">{doneToday} of {today.length} done</div>
+        {viewTasks.length > 0 && (
+          <div className="today-progress">{doneCount} of {viewTasks.length} done</div>
         )}
       </div>
 

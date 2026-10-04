@@ -1,0 +1,73 @@
+/* Deliberately quiet: the window's own chrome should be the least
+   interesting thing on screen. Its height is what --chrome reserves. */
+.titlebar {
+    flex: 0 0 34px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0.35rem 0 0.9rem;
+    /* The whole bar is a drag handle, so no text selection anywhere in it. */
+    user-select: none;
+    -webkit-user-select: none;
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.titlebar-name {
+    font-size: 0.64rem;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.22);
+}
+
+.titlebar-controls {
+    display: flex;
+    align-items: center;
+    gap: 0.15rem;
+}
+
+.titlebar-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 30px;
+    height: 24px;
+    padding: 0 0.4rem;
+    background: transparent;
+    border: none;
+    border-radius: 6px;
+    color: rgba(255, 255, 255, 0.35);
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 0.8rem;
+    line-height: 1;
+    transition: color 0.2s, background 0.2s;
+}
+
+.titlebar-btn:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.titlebar-btn--close:hover {
+    background: rgba(255, 80, 80, 0.22);
+    color: rgba(255, 220, 220, 0.95);
+}
+
+.titlebar-pin {
+    font-size: 0.6rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+}
+
+/* Pinned is a state the user needs to see at a glance, not on hover. */
+.titlebar-pin--on {
+    background: rgba(255, 200, 100, 0.14);
+    color: rgba(255, 200, 100, 0.9);
+}
+
+.titlebar-pin--on:hover {
+    background: rgba(255, 200, 100, 0.24);
+    color: rgba(255, 215, 140, 1);
+}

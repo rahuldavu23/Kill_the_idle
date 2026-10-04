@@ -16,3 +16,26 @@ body {
     font-family: 'Segoe UI', sans-serif;
     color: #F5ECD7;
 }
+
+/* The titlebar is a row above the app, so the app gets whatever is left. */
+#root {
+    display: flex;
+    flex-direction: column;
+}
+
+/* ─── Inside the desktop shell ─────────────────────────────────────────
+   The real window frame is off, so the page draws its own: the window is
+   transparent and #root is the visible, rounded surface. The page itself
+   must stay transparent or its corners would square the window off. */
+:root.desktop,
+:root.desktop body {
+    background: transparent;
+}
+
+:root.desktop #root {
+    background: #0D0B1E;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    border-radius: 12px;
+    /* Clips the panels to the rounded corners. */
+    overflow: hidden;
+}
