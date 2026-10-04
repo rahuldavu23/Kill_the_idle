@@ -1,10 +1,14 @@
 // The desktop shell around the app.
 //
 // The window itself is frameless, so the titlebar is drawn by the web side;
-// everything that cannot be done from there lives here: the tray icon that
-// the widget is summoned from, the always-on-top and launch-at-login
-// switches, and the rule that closing the window hides it rather than
-// throwing the day away.
+// everything that cannot be done from there lives here: the tray icon, the
+// always-on-top and launch-at-login switches, and the rule that closing the
+// window ends the app rather than leaving it running unseen.
+//
+// Closing is a real quit: nothing is left in the background, and the app is
+// started again from its own icon. That is safe because the day is written
+// to storage as it is edited, never on the way out, so there is nothing
+// waiting to be saved when the process ends.
 
 use tauri::{
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
@@ -103,11 +107,11 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            // Closing a widget means putting it away, not quitting it — Quit
-            // in the tray menu is the only way out.
-            if let WindowEvent::CloseRequested { api, .. } = event {
-                api.prevent_close();
-                let _ = window.hide();
+            // Closing the window ends the app. Exiting explicitly rather than
+            // letting the last window fall away keeps the behaviour the same
+            // whether or not a tray icon is holding the app alive.
+            if let WindowEvent::CloseRequested { .. } = event {
+                window.app_handle().exit(0);
             }
         })
         .run(tauri::generate_context!())

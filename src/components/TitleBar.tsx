@@ -1,6 +1,6 @@
 // The window's own chrome, drawn by the app because the real one is turned
 // off. It carries the only three things a widget needs: somewhere to grab
-// it, a pin to keep it above other windows, and a way to put it away.
+// it, a pin to keep it above other windows, and a way to quit.
 //
 // Rendered only inside the desktop shell — in a browser there is no window
 // to drag and these controls would be dead.
@@ -28,9 +28,10 @@ export default function TitleBar() {
     }
   }
 
-  // close() is deliberate rather than hide(): it goes through the shell's
-  // close handler, so "putting it away" means one thing everywhere.
-  const putAway = () => {
+  // The shell turns this into a real exit, so nothing is left running once
+  // the window is gone. Going through close() rather than exiting from here
+  // keeps that decision in one place.
+  const quit = () => {
     getCurrentWindow().close().catch(() => {})
   }
 
@@ -52,9 +53,9 @@ export default function TitleBar() {
         <button className="titlebar-btn" onClick={minimize} title="Minimize" aria-label="Minimize">—</button>
         <button
           className="titlebar-btn titlebar-btn--close"
-          onClick={putAway}
-          title="Put away — Rama waits in the tray"
-          aria-label="Put away"
+          onClick={quit}
+          title="Quit — nothing stays running"
+          aria-label="Quit"
         >×</button>
       </div>
     </div>

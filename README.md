@@ -18,14 +18,16 @@ needs neither. Everything else — lint, typecheck, build — is frontend only.
 ## The widget
 
 The window is frameless, so the app draws its own titlebar: drag it anywhere,
-`Top` pins it above other windows, `×` puts it away rather than quitting.
+`Top` pins it above other windows, `×` quits outright — nothing is left
+running in the background, and you start it again from its own icon.
 
-It then lives in the system tray:
+While it is running it also sits in the system tray:
 
 - **left click** — show or hide the window
 - **right click** — always on top, launch at login, quit
 
-Quit from the tray is the only way out. Closing the window only hides it.
+Quitting is safe at any moment: the day is written to storage as it is edited,
+never on the way out.
 
 ## What it remembers
 
